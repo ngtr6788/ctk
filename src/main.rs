@@ -1,4 +1,4 @@
-#![allow(unused_must_use)]
+#![allow(unused_must_use, unused_variables, unused_imports)]
 
 /**
  * ctk is essentially a rewrite of my previous project,
@@ -29,7 +29,7 @@ Options:
 */
 
 use std::process;
-use chrono::{DateTime, Local, FixedOffset};
+use chrono::{Date, DateTime, NaiveTime, NaiveDate, NaiveDateTime, ParseResult, TimeZone, Local, LocalResult};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -44,9 +44,33 @@ enum ForSubcommands {
     minutes: u32
   },
   Until {
-    #[clap(parse(try_from_str = DateTime::parse_from_rfc2822))]
-    endtime: DateTime<FixedOffset>,
+    #[clap(parse(try_from_str = str_to_time))]
+    endtime: NaiveTime,
+    #[clap(parse(try_from_str = str_to_date))]
+    enddate: Option<NaiveDate>,
   }
+}
+
+fn str_to_time(s: &str) -> ParseResult<NaiveTime> {
+  const ALLOWED_PARSE: [&str; 6] = ["%H:%M", "%k:%M", "%I:%M%P", "%I:%M%p", "%l:%M%P", "%l:%M%p"];
+  for parser in &ALLOWED_PARSE {
+    match NaiveTime::parse_from_str(s, parser) {
+      Ok(time) => return Ok(time),
+      Err(_) => continue,
+    }
+  }
+  return NaiveTime::parse_from_str(s, ALLOWED_PARSE[0]);
+}
+
+fn str_to_date(s: &str) -> ParseResult<NaiveDate> {
+  const ALLOWED_PARSE: [&str; 5] = ["%d %B %Y", "%e %B %Y", "%B %d %Y, %B %e %Y", "%F", "%d/%m/%Y"];
+  for parser in &ALLOWED_PARSE {
+    match NaiveDate::parse_from_str(s, parser) {
+      Ok(time) => return Ok(time),
+      Err(_) => continue,
+    }
+  }
+  return NaiveDate::parse_from_str(s, ALLOWED_PARSE[0]);
 }
 
 #[derive(Subcommand)]
@@ -92,13 +116,38 @@ fn main() {
                     ForSubcommands::For{ minutes } => {
                       cold_turkey.args(["-lock", &minutes.to_string()]).spawn();
                     },
-                    ForSubcommands::Until{ endtime } => {
-                      // A few qualms about this:
-                      // 1. The timing isn't very exact. e.g. I tried 18:00:00 and CT goes 17:59
-                      // 2. Only supports RFC 2822. (yes I have to include timezone)
-                      // 3. It's annoying
-                      let duration = endtime.signed_duration_since(Local::now());
-                      let minutes = duration.num_minutes();
+                    ForSubcommands::Until{ endtime, enddate } => {
+                      let datetime: DateTime<Local> = match enddate {
+                        Some(date) => {
+                          let naive_datetime: NaiveDateTime = date.and_time(*endtime);
+                          let datetime_result: LocalResult<DateTime<Local>> = Local.from_local_datetime(&naive_datetime);
+                          match datetime_result {
+                            LocalResult::None => {
+                              println!("Can't get the datetime specified.");
+                              return;
+                            },
+                            LocalResult::Single(datetime) => datetime,
+                            LocalResult::Ambiguous(_, _) => {
+                              println!("Datetime given is ambiguous. Maybe try to be more clear in your time?");
+                              return;
+                            }
+                          }
+                        },
+                        None => {
+                          let today: Date<Local> = Local::today();
+                          let today_time_option: Option<DateTime<Local>> = today.and_time(*endtime);
+                          match today_time_option {
+                            Some(datetime) => datetime,
+                            None => {
+                              println!("The date is assumed to be today, however, the time given seems to make it invalid.");
+                              return;
+                            }
+                          }
+                        }
+                      };
+                      
+                      let duration = datetime.signed_duration_since(Local::now());
+                      let minutes = duration.num_minutes() + 1; // + 1 since it undershoots, apparently
                       cold_turkey.args(["-lock", &minutes.to_string()]).spawn();
                     }
                   }
