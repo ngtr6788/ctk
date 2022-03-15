@@ -23,9 +23,6 @@ Usage:
 Options:
   -h --help         Show this screen.
   -e --except       Adds <url> as an exception
-  -b --break-first  Starts the pomodoro with the block name unblocked first
-  -t --timer        Displays a countdown pomodoro timer
-  --loops=LOOPS     Number of loops in a pomodoro session
 */
 
 use std::process;
@@ -33,6 +30,12 @@ use chrono::{Date, DateTime, NaiveTime, NaiveDate, NaiveDateTime, ParseResult, T
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
+#[clap(
+  name = "ctk",
+  author = "Nguyen Tran (GitHub: ngtr6788)",
+  version = "0.0.1",
+)]
+/// A better CLI interface for Cold Turkey
 struct ColdTurkey {
   #[clap(subcommand)]
   command: Option<Command>,
@@ -40,13 +43,18 @@ struct ColdTurkey {
 
 #[derive(Subcommand)]
 enum ForSubcommands {
+  /// Set a time period to block
   For {
+    /// How long to block in minutes
     minutes: u32
   },
+  /// Set when the block is finished
   Until {
     #[clap(parse(try_from_str = str_to_time))]
+    /// The time of the end of a block
     endtime: NaiveTime,
     #[clap(parse(try_from_str = str_to_date))]
+    /// The date of the end of a block. Defaults to today if not given
     enddate: Option<NaiveDate>,
   }
 }
@@ -75,25 +83,37 @@ fn str_to_date(s: &str) -> ParseResult<NaiveDate> {
 
 #[derive(Subcommand)]
 enum Command {
+  /// Start a block
   Start {
+    /// The name of the Cold Turkey block
     block_name: String,
     #[clap(short, long)]
+    /// Password to lock the block
     password: Option<String>,
     #[clap(subcommand)]
     subcommand: Option<ForSubcommands>,
   },
+  /// Stop a block
   Stop {
+    /// The name of the Cold Turkey block
     block_name: String,
   },
+  /// Add websites (urls) to a block
   Add {
+    /// The name of the Cold Turkey block
     block_name: String,
+    /// The url to add in the block
     url: String,
     #[clap(short, long)]
+    /// Whether it is black or white-listed
     except: bool,
   },
+  /// Turn on if off, turn off if on
   Toggle {
+    /// The name of the Cold Turkey block
     block_name: String,
   },
+  /// Suggest settings for Cold Turkey .ctbbl files with commands
   Suggest,
 }
 
