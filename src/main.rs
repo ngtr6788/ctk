@@ -14,7 +14,7 @@ Usage:
     suggest lock <block_name> (random | range | restart | password)
     suggest config <block_name> random <length> [-l]
     suggest config <block_name> range <start_time> <end_time> [-ul]
-    suggest config <block_name> restart [--no-unlock] [-l]
+    suggest config <block_name> restart [-ul]
     suggest config <block_name> password [-l]
     suggest nobreak <block_name>
     suggest pomodoro <block_name> <block_minutes> <break_minutes>
@@ -27,8 +27,7 @@ Usage:
     suggest pwd
     suggest (q | quit)
 Options:
-    --no-unlock     Does not automatically unlock block after a restart
-    -u --unlocked   Block is unlocked between time range (default is locked)
+    -u --unlocked   Block is unlocked after it's done
     -l --lock       Simultaneously locks with that type and configures it
     -v --verbose    Displays all blocks as well as each block's settings
     -e --except     Adds a URL as an exception
@@ -127,14 +126,8 @@ enum Command {
     Suggest,
 }
 
-#[derive(Parser)]
-struct Suggest {
-    #[clap(subcommand)]
-    subcommand: SuggestSubcommand,
-}
-
-#[derive(Subcommand)]
-enum SuggestSubcommand {
+#[derive(Parser, Debug)]
+enum Suggest {
     NewBlock {
         block_name: String,
     },
@@ -152,7 +145,9 @@ enum SuggestSubcommand {
     Config {
         block_name: String,
         #[clap(subcommand)]
-        lock_method: LockMethod,
+        lock_method: LockMethodConfig,
+        #[clap(short, long)]
+        lock: bool,
     },
     NoBreak {
         block_name: String,
@@ -170,11 +165,13 @@ enum SuggestSubcommand {
         block_name: String,
         #[clap(subcommand)]
         path_type: PathType,
+        path: String,
     },
     Delete {
         block_name: String,
         #[clap(subcommand)]
         path_type: PathType,
+        path: String,
     },
     Settings {
         block_name: String,
@@ -190,7 +187,7 @@ enum SuggestSubcommand {
     Quit,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum LockMethod {
     Random,
     Range,
@@ -198,9 +195,28 @@ enum LockMethod {
     Password,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
+enum LockMethodConfig {
+    Random { length: u8 },
+    Range {
+        start_time: NaiveTime,
+        end_time: NaiveTime,
+        #[clap(short, long)]
+        unlocked: bool
+    },
+    Restart {
+        #[clap(short, long)]
+        unlocked: bool
+    },
+    Password
+}
+
+#[derive(Subcommand, Debug)]
 enum PathType {
-    Web,
+    Web {
+        #[clap(short, long)]
+        except: bool
+    },
     File,
     Folder,
     Win10,
@@ -209,27 +225,64 @@ enum PathType {
 
 fn suggest() {
     loop {
-        let mut suggest_input: String = String::new();
-        match io::stdin().read_line(&mut suggest_input) {
-            Ok(_) => {
-                let shlex_parse: Option<Vec<String>> = shlex::split(&suggest_input);
-                match shlex_parse {
-                    Some(mut cmd_input) => {
-                        cmd_input.insert(0, "suggest".to_string());
-                        match Suggest::try_parse_from(cmd_input.into_iter()) {
-                            Ok(_) => println!("Yay!"),
-                            Err(clap_error) => {
-                                clap_error.print();
-                            },
+        let suggest_cmd: Suggest = loop {
+            let mut suggest_input: String = String::new();
+            match io::stdin().read_line(&mut suggest_input) {
+                Ok(_) => {
+                    let shlex_parse: Option<Vec<String>> = shlex::split(&suggest_input);
+                    match shlex_parse {
+                        Some(mut cmd_input) => {
+                           
+                            // For Windows, there is a carriage return at the very end,
+                            // so this should get rid of it
+                            if let Some(last) = cmd_input.last_mut() {
+                                *last = last.trim().to_string();
+                            };
+
+                            cmd_input.insert(0, "suggest".to_string());
+                            match Suggest::try_parse_from(cmd_input.into_iter()) {
+                                Ok(suggest_cmd) => {
+                                    break suggest_cmd;
+                                },
+                                Err(clap_error) => {
+                                    clap_error.print();
+                                    continue;
+                                },
+                            }
+                        }, None => {
+                            println!("Can't parse this string: pleasy try again.");
+                            continue;
                         }
-                    }, None => {
-                        println!("Can't parse this string: pleasy try again.")
                     }
+                },
+                Err(_) => {
+                    println!("Can't read any input: please try again.");
+                    continue;
+                }
+            }
+        };
+
+        match &suggest_cmd {
+            Suggest::NewBlock { block_name } => println!("Block {} added", block_name),
+            Suggest::RemoveBlock { block_name } => println!("Block {} removed", block_name),
+            Suggest::Unlock { block_name } => println!("Block {} unlocked", block_name),
+            Suggest::Lock { block_name, lock_method } => println!("Block {} has been locked by {:?}", block_name, lock_method),
+            Suggest::Config { block_name, lock_method, lock } => println!("Configured and {} locked block {} by {:?}", lock, block_name, lock_method),
+            Suggest::NoBreak { block_name } => println!("Blocks {} with no breaks", block_name),
+            Suggest::Allowance { block_name, allowance_minutes } => println!("Block {} has an allowance of {} min", block_name, allowance_minutes),
+            Suggest::Pomodoro { block_name, lock_minutes, break_minutes } => println!("Block {} has pomodoro {} block min, {} break min", block_name, lock_minutes, break_minutes),
+            Suggest::Add { block_name, path_type, path } => println!("Added {} of {:?} to {}", path, path_type, block_name),
+            Suggest::Delete { block_name, path_type, path } => println!("Deleted {} of {:?} from {}", path, path_type, block_name),
+            Suggest::Settings { block_name } => println!("Here are the settings of the blocks"),
+            Suggest::List { verbose } => println!("A list of blocks"),
+            Suggest::Save { file_name } => {
+                match file_name {
+                    Some(name) => println!("Saved to {}.ctbbl", name),
+                    None => println!("Saved to 123456.ctbbl"),
                 }
             },
-            Err(_) => {
-                println!("Can't read any input: please try again.");
-            }
+            Suggest::Pwd => println!("Current directory"),
+            Suggest::Quit => break,
         }
     }
 }
