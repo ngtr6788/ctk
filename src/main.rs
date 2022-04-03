@@ -1,10 +1,16 @@
+#![allow(dead_code, unused_must_use, unused_imports, unused_variables)]
 use chrono::{
     Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, ParseResult, TimeZone,
 };
 use clap::{Parser, Subcommand};
-use std::process;
-use std::io;
+use rand::Rng;
+use rpassword;
+use serde::{Deserialize, Serialize};
 use shlex;
+use std::collections::HashMap;
+use std::env;
+use std::io;
+use std::process;
 
 /**
 Usage:
@@ -187,7 +193,7 @@ enum Suggest {
     Quit,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Clone, Copy, Subcommand, Debug)]
 enum LockMethod {
     Random,
     Range,
@@ -197,25 +203,27 @@ enum LockMethod {
 
 #[derive(Subcommand, Debug)]
 enum LockMethodConfig {
-    Random { length: u8 },
+    Random {
+        length: u8,
+    },
     Range {
         start_time: NaiveTime,
         end_time: NaiveTime,
         #[clap(short, long)]
-        unlocked: bool
+        unlocked: bool,
     },
     Restart {
         #[clap(short, long)]
-        unlocked: bool
+        unlocked: bool,
     },
-    Password
+    Password,
 }
 
 #[derive(Subcommand, Debug)]
 enum PathType {
     Web {
         #[clap(short, long)]
-        except: bool
+        except: bool,
     },
     File,
     Folder,
@@ -223,70 +231,291 @@ enum PathType {
     Title,
 }
 
-fn suggest() {
-    loop {
-        let suggest_cmd: Suggest = loop {
-            let mut suggest_input: String = String::new();
-            match io::stdin().read_line(&mut suggest_input) {
-                Ok(_) => {
-                    let shlex_parse: Option<Vec<String>> = shlex::split(&suggest_input);
-                    match shlex_parse {
-                        Some(mut cmd_input) => {
-                           
-                            // For Windows, there is a carriage return at the very end,
-                            // so this should get rid of it
-                            if let Some(last) = cmd_input.last_mut() {
-                                *last = last.trim().to_string();
-                            };
+#[derive(Debug)]
+struct BlockSettings {
+    enabled: bool,
+    lock: Option<LockMethod>,
+    lock_unblock: bool,
+    restart_unblock: bool,
+    password: String,
+    random_text_length: u8,
+    break_type: BreakType,
+    window: Window,
+    users: String,
+    web: Vec<String>,
+    exceptions: Vec<String>,
+    apps: Vec<String>,
+    schedule: Vec<String>,
+    custom_users: Vec<String>,
+}
 
-                            cmd_input.insert(0, "suggest".to_string());
-                            match Suggest::try_parse_from(cmd_input.into_iter()) {
-                                Ok(suggest_cmd) => {
-                                    break suggest_cmd;
-                                },
-                                Err(clap_error) => {
-                                    clap_error.print();
-                                    continue;
-                                },
+#[derive(Debug)]
+enum BreakType {
+    None,
+    Allowance { minutes: u8 },
+    Pomodoro { block_min: u8, break_min: u8 },
+}
+
+#[derive(Debug)]
+struct Window {
+    lock: bool,
+    start_time: NaiveTime,
+    end_time: NaiveTime,
+}
+
+impl BlockSettings {
+    fn new() -> Self {
+        let new_settings: BlockSettings = BlockSettings {
+            enabled: false,
+            lock: None,
+            lock_unblock: true,
+            restart_unblock: true,
+            password: String::new(),
+            random_text_length: 30,
+            break_type: BreakType::None,
+            window: Window {
+                lock: true,
+                start_time: NaiveTime::from_hms(9, 0, 0),
+                end_time: NaiveTime::from_hms(17, 0, 0),
+            },
+            users: String::new(),
+            web: Vec::new(),
+            exceptions: Vec::new(),
+            apps: Vec::new(),
+            schedule: Vec::new(),
+            custom_users: Vec::new(),
+        };
+        return new_settings;
+    }
+}
+
+/**
+ * stdin_to_suggest reads input from stdin, treats them like command line
+ * arguments and returns a Suggest enum parsed by clap
+ */
+fn stdin_to_suggest() -> Suggest {
+    loop {
+        let mut suggest_input: String = String::new();
+        match io::stdin().read_line(&mut suggest_input) {
+            Ok(_) => {
+                let shlex_parse: Option<Vec<String>> = shlex::split(&suggest_input);
+                match shlex_parse {
+                    Some(mut cmd_input) => {
+                        // For Windows, there is a carriage return at the very end,
+                        // so this should get rid of it
+                        if let Some(last) = cmd_input.last_mut() {
+                            *last = last.trim().to_string();
+                        };
+
+                        cmd_input.insert(0, "suggest".to_string());
+                        match Suggest::try_parse_from(cmd_input.into_iter()) {
+                            Ok(suggest_cmd) => {
+                                return suggest_cmd;
                             }
-                        }, None => {
-                            println!("Can't parse this string: pleasy try again.");
-                            continue;
+                            Err(clap_error) => {
+                                clap_error.print();
+                                continue;
+                            }
                         }
                     }
-                },
-                Err(_) => {
-                    println!("Can't read any input: please try again.");
-                    continue;
+                    None => {
+                        println!("Can't parse this string: pleasy try again.");
+                        continue;
+                    }
                 }
             }
-        };
-
-        match &suggest_cmd {
-            Suggest::NewBlock { block_name } => println!("Block {} added", block_name),
-            Suggest::RemoveBlock { block_name } => println!("Block {} removed", block_name),
-            Suggest::Unlock { block_name } => println!("Block {} unlocked", block_name),
-            Suggest::Lock { block_name, lock_method } => println!("Block {} has been locked by {:?}", block_name, lock_method),
-            Suggest::Config { block_name, lock_method, lock } => println!("Configured and {} locked block {} by {:?}", lock, block_name, lock_method),
-            Suggest::NoBreak { block_name } => println!("Blocks {} with no breaks", block_name),
-            Suggest::Allowance { block_name, allowance_minutes } => println!("Block {} has an allowance of {} min", block_name, allowance_minutes),
-            Suggest::Pomodoro { block_name, lock_minutes, break_minutes } => println!("Block {} has pomodoro {} block min, {} break min", block_name, lock_minutes, break_minutes),
-            Suggest::Add { block_name, path_type, path } => println!("Added {} of {:?} to {}", path, path_type, block_name),
-            Suggest::Delete { block_name, path_type, path } => println!("Deleted {} of {:?} from {}", path, path_type, block_name),
-            Suggest::Settings { block_name } => println!("Here are the settings of the blocks"),
-            Suggest::List { verbose } => println!("A list of blocks"),
-            Suggest::Save { file_name } => {
-                match file_name {
-                    Some(name) => println!("Saved to {}.ctbbl", name),
-                    None => println!("Saved to 123456.ctbbl"),
-                }
-            },
-            Suggest::Pwd => println!("Current directory"),
-            Suggest::Quit => break,
+            Err(_) => {
+                println!("Can't read any input: please try again.");
+                continue;
+            }
         }
     }
 }
 
+fn suggest() {
+    let mut list_of_blocks: HashMap<String, BlockSettings> = HashMap::new();
+
+    loop {
+        // This section creates the suggest_cmd enum struct thing from
+        // reading from stdin and parsed it with clap.
+        let suggest_cmd: Suggest = stdin_to_suggest();
+
+        match suggest_cmd {
+            Suggest::NewBlock { block_name } => {
+                if list_of_blocks.contains_key(&block_name) {
+                    println!("Block {} already exists", &block_name);
+                } else {
+                    println!("Block {} added", &block_name);
+                    list_of_blocks.insert(block_name, BlockSettings::new());
+                }
+            }
+            Suggest::RemoveBlock { block_name } => {
+                if list_of_blocks.contains_key(&block_name) {
+                    println!("Block {} removed", &block_name);
+                    list_of_blocks.remove(&block_name);
+                } else {
+                    println!("Block {} does not exist", &block_name);
+                }
+            }
+            Suggest::Unlock { block_name } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => {
+                    bs.lock = None;
+                    println!("Block {} unlocked", &block_name);
+                }
+                None => println!("Block {} does not exist", &block_name),
+            },
+            Suggest::Lock {
+                block_name,
+                lock_method,
+            } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => {
+                    bs.lock = Some(lock_method);
+                    println!("Block {} has been locked by {:?}", block_name, lock_method);
+                }
+                None => println!("Block {} does not exist", block_name),
+            },
+            Suggest::Config {
+                block_name,
+                lock_method,
+                lock,
+            } => {
+                let is_locked = if lock { " and locked" } else { "" };
+                match list_of_blocks.get_mut(&block_name) {
+                    Some(bs) => match lock_method {
+                        LockMethodConfig::Random { length } => {
+                            bs.random_text_length = length;
+                            if lock {
+                                bs.lock = Some(LockMethod::Random);
+                            }
+                            println!(
+                                "Block {} was configured{} with {} random characters",
+                                block_name, is_locked, length
+                            );
+                        }
+                        LockMethodConfig::Range {
+                            start_time,
+                            end_time,
+                            unlocked,
+                        } => {
+                            bs.window = Window {
+                                lock: !unlocked,
+                                start_time,
+                                end_time,
+                            };
+                            if lock {
+                                bs.lock = Some(LockMethod::Range);
+                            }
+                            println!(
+                                "Block {} was configured{} with a time range",
+                                block_name, is_locked
+                            );
+                        }
+                        LockMethodConfig::Restart { unlocked } => {
+                            bs.restart_unblock = unlocked;
+                            if lock {
+                                bs.lock = Some(LockMethod::Restart);
+                            }
+                            println!(
+                                "Block {} was configured{} by restart",
+                                block_name, is_locked
+                            );
+                        }
+                        LockMethodConfig::Password => {
+                            if let Ok(password) =
+                                rpassword::prompt_password("Please enter your password: ")
+                            {
+                                bs.password = password;
+                            }
+                            if lock {
+                                bs.lock = Some(LockMethod::Password);
+                            }
+                            println!(
+                                "Block {} was configured{} with a password",
+                                block_name, is_locked
+                            );
+                        }
+                    },
+                    None => println!("Block {} does not exist", block_name),
+                }
+            }
+            Suggest::NoBreak { block_name } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => {
+                    bs.break_type = BreakType::None;
+                    println!("Blocks {} with no breaks", block_name)
+                }
+                None => println!("Block {} does not exist", block_name),
+            },
+            Suggest::Allowance {
+                block_name,
+                allowance_minutes,
+            } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => {
+                    bs.break_type = BreakType::Allowance {
+                        minutes: allowance_minutes,
+                    };
+                    println!(
+                        "Block {} has an allowance of {} min",
+                        block_name, allowance_minutes
+                    );
+                }
+                None => println!("Block {} does not exist", block_name),
+            },
+            Suggest::Pomodoro {
+                block_name,
+                lock_minutes,
+                break_minutes,
+            } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => {
+                    bs.break_type = BreakType::Pomodoro {
+                        block_min: lock_minutes,
+                        break_min: break_minutes,
+                    };
+                    println!(
+                        "Block {} has pomodoro {} block min, {} break min",
+                        block_name, lock_minutes, break_minutes
+                    )
+                }
+                None => println!("Block {} does not exist", block_name),
+            },
+            Suggest::Add {
+                block_name,
+                path_type,
+                path,
+            } => println!("Added {} of {:?} to {}", path, path_type, block_name),
+            Suggest::Delete {
+                block_name,
+                path_type,
+                path,
+            } => println!("Deleted {} of {:?} from {}", path, path_type, block_name),
+            Suggest::Settings { block_name } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => println!("{:?}", bs),
+                None => println!("Block {} does not exist", block_name),
+            },
+            Suggest::List { verbose } => {
+                if verbose {
+                    println!("{:?}", &list_of_blocks);
+                } else {
+                    for key in list_of_blocks.keys() {
+                        println!("{}", key);
+                    }
+                }
+            }
+            Suggest::Save { file_name } => match file_name {
+                Some(name) => println!("Saved to {}.ctbbl", name),
+                None => {
+                    let num: u64 = rand::thread_rng().gen();
+                    println!("Saved to ctk_{}.ctbbl", num);
+                }
+            },
+            Suggest::Pwd => {
+                if let Ok(current_dir) = env::current_dir() {
+                    println!("{}", current_dir.display());
+                }
+            }
+            Suggest::Quit => break,
+        }
+    }
+}
 
 fn main() {
     let mut cold_turkey =
@@ -381,7 +610,7 @@ fn main() {
                 }
                 Command::Toggle { block_name } => {
                     cold_turkey.args(["-toggle", block_name]).spawn();
-                },
+                }
                 Command::Suggest => {
                     suggest();
                 }
