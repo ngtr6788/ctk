@@ -207,7 +207,9 @@ enum LockMethodConfig {
         length: u8,
     },
     Range {
+        #[clap(parse(try_from_str = str_to_time))]
         start_time: NaiveTime,
+        #[clap(parse(try_from_str = str_to_time))]
         end_time: NaiveTime,
         #[clap(short, long)]
         unlocked: bool,
@@ -244,9 +246,23 @@ struct BlockSettings {
     users: String,
     web: Vec<String>,
     exceptions: Vec<String>,
-    apps: Vec<String>,
+    apps: Vec<App>,
     schedule: Vec<String>,
     custom_users: Vec<String>,
+}
+
+#[derive(Debug)]
+struct App {
+    app_type: AppType,
+    path: String,
+}
+
+#[derive(Debug)]
+enum AppType {
+    File,
+    Folder,
+    Win10,
+    Title,
 }
 
 #[derive(Debug)]
@@ -481,7 +497,49 @@ fn suggest() {
                 block_name,
                 path_type,
                 path,
-            } => println!("Added {} of {:?} to {}", path, path_type, block_name),
+            } => {
+                println!("Added {} of {:?} to {}", &path, path_type, block_name);
+                match list_of_blocks.get_mut(&block_name) {
+                    Some(bs) => match path_type {
+                        PathType::Web { except } => {
+                            if except {
+                                bs.exceptions.push(path);
+                            } else {
+                                bs.web.push(path);
+                            }
+                        }
+                        PathType::File => {
+                            let app = App {
+                                app_type: AppType::File,
+                                path,
+                            };
+                            bs.apps.push(app);
+                        }
+                        PathType::Folder => {
+                            let app = App {
+                                app_type: AppType::Folder,
+                                path,
+                            };
+                            bs.apps.push(app);
+                        }
+                        PathType::Win10 => {
+                            let app = App {
+                                app_type: AppType::Win10,
+                                path,
+                            };
+                            bs.apps.push(app);
+                        }
+                        PathType::Title => {
+                            let app = App {
+                                app_type: AppType::Title,
+                                path,
+                            };
+                            bs.apps.push(app);
+                        }
+                    },
+                    None => println!("Block {} does not exist", block_name),
+                }
+            }
             Suggest::Delete {
                 block_name,
                 path_type,
