@@ -10,6 +10,7 @@ use shlex;
 use std::collections::HashMap;
 use std::env;
 use std::io;
+use std::io::Write;
 use std::process;
 
 /**
@@ -160,12 +161,12 @@ enum Suggest {
     },
     Allowance {
         block_name: String,
-        allowance_minutes: u8,
+        allowance_minutes: u16,
     },
     Pomodoro {
         block_name: String,
-        lock_minutes: u8,
-        break_minutes: u8,
+        lock_minutes: u16,
+        break_minutes: u16,
     },
     Add {
         block_name: String,
@@ -204,7 +205,7 @@ enum LockMethod {
 #[derive(Subcommand, Debug)]
 enum LockMethodConfig {
     Random {
-        length: u8,
+        length: u16,
     },
     Range {
         #[clap(parse(try_from_str = str_to_time))]
@@ -240,7 +241,7 @@ struct BlockSettings {
     lock_unblock: bool,
     restart_unblock: bool,
     password: String,
-    random_text_length: u8,
+    random_text_length: u16,
     break_type: BreakType,
     window: Window,
     users: String,
@@ -251,13 +252,13 @@ struct BlockSettings {
     custom_users: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct App {
     app_type: AppType,
     path: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum AppType {
     File,
     Folder,
@@ -268,8 +269,8 @@ enum AppType {
 #[derive(Debug)]
 enum BreakType {
     None,
-    Allowance { minutes: u8 },
-    Pomodoro { block_min: u8, break_min: u8 },
+    Allowance { minutes: u16 },
+    Pomodoro { block_min: u16, break_min: u16 },
 }
 
 #[derive(Debug)]
@@ -311,6 +312,8 @@ impl BlockSettings {
  */
 fn stdin_to_suggest() -> Suggest {
     loop {
+        print!("> suggest ");
+        io::stdout().flush();
         let mut suggest_input: String = String::new();
         match io::stdin().read_line(&mut suggest_input) {
             Ok(_) => {
@@ -544,7 +547,72 @@ fn suggest() {
                 block_name,
                 path_type,
                 path,
-            } => println!("Deleted {} of {:?} from {}", path, path_type, block_name),
+            } => match list_of_blocks.get_mut(&block_name) {
+                Some(bs) => match path_type {
+                    PathType::Web { except } => {
+                        let remove_vec: &mut Vec<String> = if except {
+                            &mut bs.exceptions
+                        } else {
+                            &mut bs.web
+                        };
+                        if let Some(idx) = remove_vec.iter().position(|s| *s == path) {
+                            remove_vec.swap_remove(idx);
+                            println!("Web path {} removed from block {}", &path, &block_name);
+                        } else {
+                            println!("Web path {} does not exist in block {}", &path, &block_name);
+                        }
+                    }
+                    PathType::File => {
+                        let app = App {
+                            app_type: AppType::File,
+                            path,
+                        };
+                        if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
+                            bs.apps.swap_remove(idx);
+                            println!("File {} removed from {}", &app.path, &block_name);
+                        } else {
+                            println!("File {} does not exist in {}", &app.path, &block_name);
+                        }
+                    }
+                    PathType::Folder => {
+                        let app = App {
+                            app_type: AppType::Folder,
+                            path,
+                        };
+                        if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
+                            bs.apps.swap_remove(idx);
+                            println!("Folder {} removed from {}", &app.path, &block_name);
+                        } else {
+                            println!("Folder {} does not exist in {}", &app.path, &block_name);
+                        }
+                    }
+                    PathType::Title => {
+                        let app = App {
+                            app_type: AppType::Title,
+                            path,
+                        };
+                        if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
+                            bs.apps.swap_remove(idx);
+                            println!("Title {} removed from {}", &app.path, &block_name);
+                        } else {
+                            println!("Title {} does not exist in {}", &app.path, &block_name);
+                        }
+                    }
+                    PathType::Win10 => {
+                        let app = App {
+                            app_type: AppType::Win10,
+                            path,
+                        };
+                        if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
+                            bs.apps.swap_remove(idx);
+                            println!("Window 10 app {} removed from {}", &app.path, &block_name);
+                        } else {
+                            println!("Window 10 app {} does not exist in {}", &app.path, &block_name);
+                        }
+                    }
+                },
+                None => println!("Block {} does not exist", &block_name),
+            },
             Suggest::Settings { block_name } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => println!("{:?}", bs),
                 None => println!("Block {} does not exist", block_name),
@@ -558,12 +626,15 @@ fn suggest() {
                     }
                 }
             }
-            Suggest::Save { file_name } => match file_name {
-                Some(name) => println!("Saved to {}.ctbbl", name),
-                None => {
-                    let num: u64 = rand::thread_rng().gen();
-                    println!("Saved to ctk_{}.ctbbl", num);
-                }
+            Suggest::Save { file_name } => {
+                let final_file: String = match file_name {
+                    Some(name) => name + ".ctbbl",
+                    None => {
+                        let num: u64 = rand::thread_rng().gen();
+                        "ctk_".to_owned() + &num.to_string() + ".ctbbl"
+                    }
+                };
+                println!("Saved to {}", final_file);
             },
             Suggest::Pwd => {
                 if let Ok(current_dir) = env::current_dir() {
@@ -580,100 +651,85 @@ fn main() {
         process::Command::new(r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe");
     let args = ColdTurkey::parse();
     match &args.command {
-        Some(cmd) => {
-            match &cmd {
-                Command::Start {
-                    block_name,
-                    password,
-                    subcommand,
-                } => {
-                    cold_turkey.args(["-start", block_name]);
-                    match password {
-                        Some(p) => {
-                            cold_turkey.args(["-password", p]).spawn();
-                        }
-                        None => {
-                            match subcommand {
-                                Some(method) => {
-                                    match method {
-                                        ForSubcommands::For { minutes } => {
-                                            cold_turkey
-                                                .args(["-lock", &minutes.to_string()])
-                                                .spawn();
-                                        }
-                                        ForSubcommands::Until { endtime, enddate } => {
-                                            let datetime: DateTime<Local> = match enddate {
-                                                Some(date) => {
-                                                    let naive_datetime: NaiveDateTime =
-                                                        date.and_time(*endtime);
-                                                    let datetime_result: LocalResult<
-                                                        DateTime<Local>,
-                                                    > = Local.from_local_datetime(&naive_datetime);
-                                                    match datetime_result {
-                                                        LocalResult::None => {
-                                                            println!(
-                                                                "Can't get the datetime specified."
-                                                            );
-                                                            return;
-                                                        }
-                                                        LocalResult::Single(datetime) => datetime,
-                                                        LocalResult::Ambiguous(_, _) => {
-                                                            println!("Datetime given is ambiguous. Maybe try to be more clear in your time?");
-                                                            return;
-                                                        }
-                                                    }
-                                                }
-                                                None => {
-                                                    let today: Date<Local> = Local::today();
-                                                    let today_time_option: Option<DateTime<Local>> =
-                                                        today.and_time(*endtime);
-                                                    match today_time_option {
-                                                        Some(datetime) => datetime,
-                                                        None => {
-                                                            println!("The date is assumed to be today, however, the time given seems to make it invalid.");
-                                                            return;
-                                                        }
-                                                    }
-                                                }
-                                            };
-
-                                            let duration =
-                                                datetime.signed_duration_since(Local::now());
-                                            let minutes = duration.num_minutes() + 1; // + 1 since it undershoots, apparently
-                                            cold_turkey
-                                                .args(["-lock", &minutes.to_string()])
-                                                .spawn();
+        Some(cmd) => match &cmd {
+            Command::Start {
+                block_name,
+                password,
+                subcommand,
+            } => {
+                cold_turkey.args(["-start", block_name]);
+                match password {
+                    Some(p) => {
+                        cold_turkey.args(["-password", p]).spawn();
+                    }
+                    None => match subcommand {
+                        Some(method) => match method {
+                            ForSubcommands::For { minutes } => {
+                                cold_turkey.args(["-lock", &minutes.to_string()]).spawn();
+                            }
+                            ForSubcommands::Until { endtime, enddate } => {
+                                let datetime: DateTime<Local> = match enddate {
+                                    Some(date) => {
+                                        let naive_datetime: NaiveDateTime = date.and_time(*endtime);
+                                        let datetime_result: LocalResult<DateTime<Local>> =
+                                            Local.from_local_datetime(&naive_datetime);
+                                        match datetime_result {
+                                            LocalResult::None => {
+                                                println!("Can't get the datetime specified.");
+                                                return;
+                                            }
+                                            LocalResult::Single(datetime) => datetime,
+                                            LocalResult::Ambiguous(_, _) => {
+                                                println!("Datetime given is ambiguous. Maybe try to be more clear in your time?");
+                                                return;
+                                            }
                                         }
                                     }
-                                }
-                                None => {
-                                    cold_turkey.spawn();
-                                }
+                                    None => {
+                                        let today: Date<Local> = Local::today();
+                                        let today_time_option: Option<DateTime<Local>> =
+                                            today.and_time(*endtime);
+                                        match today_time_option {
+                                            Some(datetime) => datetime,
+                                            None => {
+                                                println!("The date is assumed to be today, however, the time given seems to make it invalid.");
+                                                return;
+                                            }
+                                        }
+                                    }
+                                };
+
+                                let duration = datetime.signed_duration_since(Local::now());
+                                let minutes = f64::round(duration.num_seconds() as f64 / 60.0) as i64;
+                                cold_turkey.args(["-lock", &minutes.to_string()]).spawn();
                             }
+                        },
+                        None => {
+                            cold_turkey.spawn();
                         }
-                    }
-                }
-                Command::Stop { block_name } => {
-                    cold_turkey.args(["-stop", block_name]).spawn();
-                }
-                Command::Add {
-                    block_name,
-                    url,
-                    except,
-                } => {
-                    let except_cmd: &str = if *except { "-exception" } else { "-web" };
-                    cold_turkey
-                        .args(["-add", block_name, except_cmd, url])
-                        .spawn();
-                }
-                Command::Toggle { block_name } => {
-                    cold_turkey.args(["-toggle", block_name]).spawn();
-                }
-                Command::Suggest => {
-                    suggest();
+                    },
                 }
             }
-        }
+            Command::Stop { block_name } => {
+                cold_turkey.args(["-stop", block_name]).spawn();
+            }
+            Command::Add {
+                block_name,
+                url,
+                except,
+            } => {
+                let except_cmd: &str = if *except { "-exception" } else { "-web" };
+                cold_turkey
+                    .args(["-add", block_name, except_cmd, url])
+                    .spawn();
+            }
+            Command::Toggle { block_name } => {
+                cold_turkey.args(["-toggle", block_name]).spawn();
+            }
+            Command::Suggest => {
+                suggest();
+            }
+        },
         None => {
             match cold_turkey.spawn() {
                 Ok(_) => println!("Launches Cold Turkey!"),
