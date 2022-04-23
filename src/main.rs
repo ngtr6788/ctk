@@ -1,17 +1,20 @@
 #![allow(dead_code, unused_must_use, unused_imports, unused_variables)]
 use chrono::{
-    Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, ParseResult, TimeZone,
+    Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, ParseResult, Timelike, TimeZone
 };
 use clap::{Parser, Subcommand};
 use rand::Rng;
 use rpassword;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use shlex;
 use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::io::Write;
 use std::process;
+use std::path::Path;
+use std::fs::File;
 
 /**
 Usage:
@@ -44,7 +47,7 @@ Options:
 #[clap(
     name = "ctk",
     author = "Nguyen Tran (GitHub: ngtr6788)",
-    version = "0.0.1"
+    version = "0.1.0"
 )]
 /// A better CLI interface for Cold Turkey
 struct ColdTurkey {
@@ -194,7 +197,7 @@ enum Suggest {
     Quit,
 }
 
-#[derive(Clone, Copy, Subcommand, Debug)]
+#[derive(Clone, Copy, Subcommand, Debug, Serialize)]
 enum LockMethod {
     Random,
     Range,
@@ -234,7 +237,7 @@ enum PathType {
     Title,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct BlockSettings {
     enabled: bool,
     lock: Option<LockMethod>,
@@ -243,41 +246,27 @@ struct BlockSettings {
     password: String,
     random_text_length: u16,
     break_type: BreakType,
-    window: Window,
+    window: String,
     users: String,
     web: Vec<String>,
     exceptions: Vec<String>,
-    apps: Vec<App>,
+    apps: Vec<String>,
     schedule: Vec<String>,
     custom_users: Vec<String>,
 }
 
-#[derive(Debug, PartialEq)]
-struct App {
-    app_type: AppType,
-    path: String,
-}
-
-#[derive(Debug, PartialEq)]
-enum AppType {
-    File,
-    Folder,
-    Win10,
-    Title,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 enum BreakType {
     None,
     Allowance { minutes: u16 },
     Pomodoro { block_min: u16, break_min: u16 },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct Window {
     lock: bool,
-    start_time: NaiveTime,
-    end_time: NaiveTime,
+    start_time: String,
+    end_time: String,
 }
 
 impl BlockSettings {
@@ -290,11 +279,7 @@ impl BlockSettings {
             password: String::new(),
             random_text_length: 30,
             break_type: BreakType::None,
-            window: Window {
-                lock: true,
-                start_time: NaiveTime::from_hms(9, 0, 0),
-                end_time: NaiveTime::from_hms(17, 0, 0),
-            },
+            window: "lock@9,0@17,0".to_string(),
             users: String::new(),
             web: Vec::new(),
             exceptions: Vec::new(),
@@ -416,11 +401,10 @@ fn suggest() {
                             end_time,
                             unlocked,
                         } => {
-                            bs.window = Window {
-                                lock: !unlocked,
-                                start_time,
-                                end_time,
-                            };
+                            let window_string = if unlocked { "unlock".to_owned() } else { "lock".to_owned() };
+                            let start_string = "@".to_owned() + &start_time.hour().to_string() + "," + &start_time.minute().to_string();
+                            let end_string = "@".to_owned() + &end_time.hour().to_string() + "," + &end_time.minute().to_string();
+                            bs.window = window_string + &start_string + &end_string;
                             if lock {
                                 bs.lock = Some(LockMethod::Range);
                             }
@@ -512,31 +496,19 @@ fn suggest() {
                             }
                         }
                         PathType::File => {
-                            let app = App {
-                                app_type: AppType::File,
-                                path,
-                            };
+                            let app = "file:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                         PathType::Folder => {
-                            let app = App {
-                                app_type: AppType::Folder,
-                                path,
-                            };
+                            let app = "app:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                         PathType::Win10 => {
-                            let app = App {
-                                app_type: AppType::Win10,
-                                path,
-                            };
+                            let app = "win10:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                         PathType::Title => {
-                            let app = App {
-                                app_type: AppType::Title,
-                                path,
-                            };
+                            let app = "title:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                     },
@@ -563,51 +535,39 @@ fn suggest() {
                         }
                     }
                     PathType::File => {
-                        let app = App {
-                            app_type: AppType::File,
-                            path,
-                        };
+                        let app = "file:".to_owned() + &path;
                         if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
                             bs.apps.swap_remove(idx);
-                            println!("File {} removed from {}", &app.path, &block_name);
+                            println!("File {} removed from {}", &path, &block_name);
                         } else {
-                            println!("File {} does not exist in {}", &app.path, &block_name);
+                            println!("File {} does not exist in {}", &path, &block_name);
                         }
                     }
                     PathType::Folder => {
-                        let app = App {
-                            app_type: AppType::Folder,
-                            path,
-                        };
+                        let app = "folder:".to_owned() + &path;
                         if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
                             bs.apps.swap_remove(idx);
-                            println!("Folder {} removed from {}", &app.path, &block_name);
+                            println!("Folder {} removed from {}", &path, &block_name);
                         } else {
-                            println!("Folder {} does not exist in {}", &app.path, &block_name);
+                            println!("Folder {} does not exist in {}", &path, &block_name);
                         }
                     }
                     PathType::Title => {
-                        let app = App {
-                            app_type: AppType::Title,
-                            path,
-                        };
+                        let app = "title:".to_owned() + &path;
                         if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
                             bs.apps.swap_remove(idx);
-                            println!("Title {} removed from {}", &app.path, &block_name);
+                            println!("Title {} removed from {}", &path, &block_name);
                         } else {
-                            println!("Title {} does not exist in {}", &app.path, &block_name);
+                            println!("Title {} does not exist in {}", &path, &block_name);
                         }
                     }
                     PathType::Win10 => {
-                        let app = App {
-                            app_type: AppType::Win10,
-                            path,
-                        };
+                        let app = "win10:".to_owned() + &path;
                         if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
                             bs.apps.swap_remove(idx);
-                            println!("Window 10 app {} removed from {}", &app.path, &block_name);
+                            println!("Window 10 app {} removed from {}", &path, &block_name);
                         } else {
-                            println!("Window 10 app {} does not exist in {}", &app.path, &block_name);
+                            println!("Window 10 app {} does not exist in {}", &path, &block_name);
                         }
                     }
                 },
@@ -634,7 +594,21 @@ fn suggest() {
                         "ctk_".to_owned() + &num.to_string() + ".ctbbl"
                     }
                 };
-                println!("Saved to {}", final_file);
+                
+                let path = Path::new(&final_file);
+                let display = path.display();
+                
+                match File::create(&path) {
+                    Ok(file) => {
+                        match serde_json::to_writer_pretty(file, &list_of_blocks) {
+                            Ok(_) => println!("Successfully saved to {} in current directory", display),
+                            Err(why) => println!("Could not write to {}: {}", display, why),
+                        }
+                    }
+                    Err(why) => {
+                        println!("Could not create {}: {}", display, why);
+                    }
+                }
             },
             Suggest::Pwd => {
                 if let Ok(current_dir) = env::current_dir() {
