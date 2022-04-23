@@ -5,7 +5,7 @@ use chrono::{
 use clap::{Parser, Subcommand};
 use rand::Rng;
 use rpassword;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json;
 use shlex;
 use std::collections::HashMap;
@@ -15,33 +15,6 @@ use std::io::Write;
 use std::process;
 use std::path::Path;
 use std::fs::File;
-
-/**
-Usage:
-    suggest new <block_name>
-    suggest remove <block_name>
-    suggest unlock <block_name>
-    suggest lock <block_name> (random | range | restart | password)
-    suggest config <block_name> random <length> [-l]
-    suggest config <block_name> range <start_time> <end_time> [-ul]
-    suggest config <block_name> restart [-ul]
-    suggest config <block_name> password [-l]
-    suggest nobreak <block_name>
-    suggest pomodoro <block_name> <block_minutes> <break_minutes>
-    suggest allowance <block_name> <minutes>
-    suggest (add | delete) <block_name> web <url> [-e]
-    suggest (add | delete) <block_name> (file | folder | win10 | title) <path>
-    suggest settings <block_name>
-    suggest blocks [-v]
-    suggest save [<file_name>]
-    suggest pwd
-    suggest (q | quit)
-Options:
-    -u --unlocked   Block is unlocked after it's done
-    -l --lock       Simultaneously locks with that type and configures it
-    -v --verbose    Displays all blocks as well as each block's settings
-    -e --except     Adds a URL as an exception
-*/
 
 #[derive(Parser)]
 #[clap(
@@ -198,8 +171,11 @@ enum Suggest {
 }
 
 #[derive(Clone, Copy, Subcommand, Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
 enum LockMethod {
+    None,
     Random,
+    #[serde(rename = "window")]
     Range,
     Restart,
     Password,
@@ -238,14 +214,17 @@ enum PathType {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 struct BlockSettings {
-    enabled: bool,
-    lock: Option<LockMethod>,
-    lock_unblock: bool,
-    restart_unblock: bool,
+    #[serde(rename = "type")]
+    sched_type: SchedType,
+    lock: LockMethod,
+    lock_unblock: String,
+    restart_unblock: String,
     password: String,
-    random_text_length: u16,
-    break_type: BreakType,
+    random_text_length: String,
+    #[serde(rename = "break")]
+    break_type: String,
     window: String,
     users: String,
     web: Vec<String>,
@@ -255,11 +234,11 @@ struct BlockSettings {
     custom_users: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-enum BreakType {
-    None,
-    Allowance { minutes: u16 },
-    Pomodoro { block_min: u16, break_min: u16 },
+#[derive(Debug, Serialize)]
+#[serde(rename_all(serialize = "lowercase"))]
+enum SchedType {
+    Continuous,
+    Scheduled
 }
 
 #[derive(Debug, Serialize)]
@@ -272,13 +251,13 @@ struct Window {
 impl BlockSettings {
     fn new() -> Self {
         let new_settings: BlockSettings = BlockSettings {
-            enabled: false,
-            lock: None,
-            lock_unblock: true,
-            restart_unblock: true,
+            sched_type: SchedType::Continuous,
+            lock: LockMethod::None,
+            lock_unblock: true.to_string(),
+            restart_unblock: true.to_string(),
             password: String::new(),
-            random_text_length: 30,
-            break_type: BreakType::None,
+            random_text_length: 30.to_string(),
+            break_type: "none".to_owned(),
             window: "lock@9,0@17,0".to_string(),
             users: String::new(),
             web: Vec::new(),
@@ -363,7 +342,7 @@ fn suggest() {
             }
             Suggest::Unlock { block_name } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
-                    bs.lock = None;
+                    bs.lock = LockMethod::None;
                     println!("Block {} unlocked", &block_name);
                 }
                 None => println!("Block {} does not exist", &block_name),
@@ -373,7 +352,7 @@ fn suggest() {
                 lock_method,
             } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
-                    bs.lock = Some(lock_method);
+                    bs.lock = lock_method;
                     println!("Block {} has been locked by {:?}", block_name, lock_method);
                 }
                 None => println!("Block {} does not exist", block_name),
@@ -387,9 +366,9 @@ fn suggest() {
                 match list_of_blocks.get_mut(&block_name) {
                     Some(bs) => match lock_method {
                         LockMethodConfig::Random { length } => {
-                            bs.random_text_length = length;
+                            bs.random_text_length = length.to_string();
                             if lock {
-                                bs.lock = Some(LockMethod::Random);
+                                bs.lock = LockMethod::Random;
                             }
                             println!(
                                 "Block {} was configured{} with {} random characters",
@@ -406,7 +385,7 @@ fn suggest() {
                             let end_string = "@".to_owned() + &end_time.hour().to_string() + "," + &end_time.minute().to_string();
                             bs.window = window_string + &start_string + &end_string;
                             if lock {
-                                bs.lock = Some(LockMethod::Range);
+                                bs.lock = LockMethod::Range;
                             }
                             println!(
                                 "Block {} was configured{} with a time range",
@@ -414,9 +393,9 @@ fn suggest() {
                             );
                         }
                         LockMethodConfig::Restart { unlocked } => {
-                            bs.restart_unblock = unlocked;
+                            bs.restart_unblock = unlocked.to_string();
                             if lock {
-                                bs.lock = Some(LockMethod::Restart);
+                                bs.lock = LockMethod::Restart;
                             }
                             println!(
                                 "Block {} was configured{} by restart",
@@ -430,7 +409,7 @@ fn suggest() {
                                 bs.password = password;
                             }
                             if lock {
-                                bs.lock = Some(LockMethod::Password);
+                                bs.lock = LockMethod::Password;
                             }
                             println!(
                                 "Block {} was configured{} with a password",
@@ -443,7 +422,7 @@ fn suggest() {
             }
             Suggest::NoBreak { block_name } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
-                    bs.break_type = BreakType::None;
+                    bs.break_type = "none".to_owned();
                     println!("Blocks {} with no breaks", block_name)
                 }
                 None => println!("Block {} does not exist", block_name),
@@ -453,9 +432,7 @@ fn suggest() {
                 allowance_minutes,
             } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
-                    bs.break_type = BreakType::Allowance {
-                        minutes: allowance_minutes,
-                    };
+                    bs.break_type = allowance_minutes.to_string();
                     println!(
                         "Block {} has an allowance of {} min",
                         block_name, allowance_minutes
@@ -469,10 +446,7 @@ fn suggest() {
                 break_minutes,
             } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
-                    bs.break_type = BreakType::Pomodoro {
-                        block_min: lock_minutes,
-                        break_min: break_minutes,
-                    };
+                    bs.break_type = lock_minutes.to_string() + "," + &break_minutes.to_string();
                     println!(
                         "Block {} has pomodoro {} block min, {} break min",
                         block_name, lock_minutes, break_minutes
