@@ -58,10 +58,11 @@ fn str_to_time(s: &str) -> ParseResult<NaiveTime> {
 }
 
 fn str_to_date(s: &str) -> ParseResult<NaiveDate> {
-    const ALLOWED_PARSE: [&str; 5] = [
+    const ALLOWED_PARSE: [&str; 6] = [
         "%d %B %Y",
         "%e %B %Y",
-        "%B %d %Y, %B %e %Y",
+        "%B %d %Y", 
+        "%B %e %Y",
         "%F",
         "%d/%m/%Y",
     ];
