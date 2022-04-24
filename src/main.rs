@@ -362,7 +362,7 @@ fn stdin_to_suggest() -> Suggest {
                         }
                     }
                     None => {
-                        println!("Can't parse this string: pleasy try again.");
+                        println!("Can't parse this command: pleasy try again.");
                         continue;
                     }
                 }
@@ -413,7 +413,13 @@ fn suggest() {
             } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
                     bs.lock = lock_method;
-                    println!("Block {} has been locked by {:?}", block_name, lock_method);
+                    match lock_method {
+                        LockMethod::None => println!("Block {} unlocked", block_name),
+                        LockMethod::Random => println!("Block {} locked by a string of random characters", block_name),
+                        LockMethod::Range => println!("Block {} locked within some time range", block_name),
+                        LockMethod::Restart => println!("Block {} locked until restart", block_name),
+                        LockMethod::Password => println!("Block {} locked with a password", block_name),
+                    };
                 }
                 None => println!("Block {} does not exist", block_name),
             },
@@ -508,7 +514,7 @@ fn suggest() {
                 Some(bs) => {
                     bs.break_type = lock_minutes.to_string() + "," + &break_minutes.to_string();
                     println!(
-                        "Block {} has pomodoro {} block min, {} break min",
+                        "Block {} has pomodoro of {} block min, {} break min",
                         block_name, lock_minutes, break_minutes
                     )
                 }
@@ -519,30 +525,35 @@ fn suggest() {
                 path_type,
                 mut path,
             } => {
-                println!("Added {} of {:?} to {}", &path, path_type, block_name);
                 path = path.replace("\\", "/");
                 match list_of_blocks.get_mut(&block_name) {
                     Some(bs) => match path_type {
                         PathType::Web { except } => {
                             if except {
+                                println!("Added {} to {} as a website exception", &path, block_name);
                                 bs.exceptions.push(path);
                             } else {
+                                println!("Added {} to {} as a website", &path, block_name);
                                 bs.web.push(path);
                             }
                         }
                         PathType::File => {
+                            println!("Added {} to {} as a file", &path, block_name);
                             let app = "file:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                         PathType::Folder => {
+                            println!("Added {} to {} as a folder", &path, block_name);
                             let app = "app:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                         PathType::Win10 => {
+                            println!("Added {} to {} as a Windows 10 application", &path, block_name);
                             let app = "win10:".to_owned() + &path;
                             bs.apps.push(app);
                         }
                         PathType::Title => {
+                            println!("Added {} to {} as a window title", &path, block_name);
                             let app = "title:".to_owned() + &path;
                             bs.apps.push(app);
                         }
@@ -591,18 +602,18 @@ fn suggest() {
                         let app = "title:".to_owned() + &path;
                         if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
                             bs.apps.swap_remove(idx);
-                            println!("Title {} removed from {}", &path, &block_name);
+                            println!("Window title {} removed from {}", &path, &block_name);
                         } else {
-                            println!("Title {} does not exist in {}", &path, &block_name);
+                            println!("Window title {} does not exist in {}", &path, &block_name);
                         }
                     }
                     PathType::Win10 => {
                         let app = "win10:".to_owned() + &path;
                         if let Some(idx) = bs.apps.iter().position(|a| *a == app) {
                             bs.apps.swap_remove(idx);
-                            println!("Window 10 app {} removed from {}", &path, &block_name);
+                            println!("Windows 10 application {} removed from {}", &path, &block_name);
                         } else {
-                            println!("Window 10 app {} does not exist in {}", &path, &block_name);
+                            println!("Windows 10 application {} does not exist in {}", &path, &block_name);
                         }
                     }
                 },
@@ -614,7 +625,11 @@ fn suggest() {
             },
             Suggest::List { verbose } => {
                 if verbose {
-                    println!("{:?}", &list_of_blocks);
+                    if let Ok(pretty_json) = serde_json::to_string_pretty(&list_of_blocks) {
+                        println!("{}", pretty_json);
+                    } else {
+                        println!("Due to unexpected reasons, we cannot pretty display the blocks with all its settings");
+                    }
                 } else {
                     for key in list_of_blocks.keys() {
                         println!("{}", key);
