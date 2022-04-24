@@ -110,106 +110,165 @@ enum Command {
 }
 
 #[derive(Parser, Debug)]
+/// Suggests what blocks Cold Turkey should have
 enum Suggest {
+    /// Creates a new block
     NewBlock {
+        /// Name your wishlist Cold Turkey block
         block_name: String,
     },
+    /// Removes a block
     RemoveBlock {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
     },
+    /// Unlocks a block (no lock type is set)
     Unlock {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
     },
+    /// Locks a block with various methods
     Lock {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
         #[clap(subcommand)]
+        /// How a block is locked when block is turned on
         lock_method: LockMethod,
     },
+    /// Configures a block-locking method with custom settings
     Config {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
         #[clap(subcommand)]
+        /// How a block is locked when block is turned on
         lock_method: LockMethodConfig,
         #[clap(short, long)]
+        /// Locks this block with this method
         lock: bool,
     },
+    /// When set, blocks without breaks
     NoBreak {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
     },
+    /// Allows unblocked until time is up
     Allowance {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
+        /// How long to allow unblocked
         allowance_minutes: u16,
     },
+    /// Blocks for a certain time, then breaks for a certain time
     Pomodoro {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
+        /// How long for the block to be blocked
         lock_minutes: u16,
+        /// How long for the block to relax its block
         break_minutes: u16,
     },
+    /// Adds a website or application to a block
     Add {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
         #[clap(subcommand)]
+        /// What the path should be considered as
         path_type: PathType,
+        /// File path on a computer or URL of a website
         path: String,
     },
+    /// Deletes a website or application from a block
     Delete {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
         #[clap(subcommand)]
+        /// What the path should be considered as
         path_type: PathType,
+        /// File path on a computer or URL of a website
         path: String,
     },
+    /// Shows all the settings of a block
     Settings {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
     },
+    /// Lists all the blocks (verbose optional)
     List {
         #[clap(short, long)]
+        /// Displays all the blocks as well as their settings
         verbose: bool,
     },
+    /// Saves all the block settings to a .ctbbl file in pretty JSON format
     Save {
+        /// To be saved as [file_name].ctbbl
         file_name: Option<String>,
     },
+    /// Shows current directory
     Pwd,
+    /// Quits suggest
     Quit,
 }
 
 #[derive(Clone, Copy, Subcommand, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum LockMethod {
+    /// No lock at all
     None,
+    /// Locks with a random string
     Random,
     #[serde(rename = "window")]
+    /// Locks/Unlocks within a time range
     Range,
+    /// Locks until computer restart
     Restart,
+    /// Locks with a password
     Password,
 }
 
 #[derive(Subcommand, Debug)]
 enum LockMethodConfig {
+    /// Locks with a random string
     Random {
+        /// Length of the random string
         length: u16,
     },
+    /// Locks/Unlocks within a time range
     Range {
         #[clap(parse(try_from_str = str_to_time))]
+        /// Start of block range
         start_time: NaiveTime,
         #[clap(parse(try_from_str = str_to_time))]
+        /// End of block range
         end_time: NaiveTime,
         #[clap(short, long)]
+        /// Set the block to be unlocked in this range instead of locked
         unlocked: bool,
     },
+    /// Locks until computer restart
     Restart {
         #[clap(short, long)]
+        /// Set the block to be unlocked after computer restart
         unlocked: bool,
     },
+    /// Locks with a password
     Password,
 }
 
 #[derive(Subcommand, Debug)]
 enum PathType {
+    /// Website path
     Web {
         #[clap(short, long)]
+        /// Adds this URL as an exception
         except: bool,
     },
+    /// Applications in a file (e.g. .exe files in Windows)
     File,
+    /// Many applications in a folder
     Folder,
+    /// Windows 10 application
     Win10,
+    /// Matches any window title with a name
     Title,
 }
 
@@ -457,9 +516,10 @@ fn suggest() {
             Suggest::Add {
                 block_name,
                 path_type,
-                path,
+                mut path,
             } => {
                 println!("Added {} of {:?} to {}", &path, path_type, block_name);
+                path = path.replace("\\", "/");
                 match list_of_blocks.get_mut(&block_name) {
                     Some(bs) => match path_type {
                         PathType::Web { except } => {
