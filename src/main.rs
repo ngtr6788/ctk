@@ -21,7 +21,11 @@ use std::fs::File;
     author = "Nguyen Tran (GitHub: ngtr6788)",
     version = "0.1.0"
 )]
-/// A better CLI interface for Cold Turkey
+/// A better CLI interface for Cold Turkey.
+///
+/// Must have Cold Turkey installed in:
+///     WINDOWS: C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe
+///     MAC: /Applications/Cold Turkey Blocker.app/Contents/MacOS/Cold Turkey Blocker
 struct ColdTurkey {
     #[clap(subcommand)]
     command: Option<Command>,
@@ -106,6 +110,7 @@ enum Command {
         /// The name of the Cold Turkey block
         block_name: String,
     },
+    /// Interactively suggest what blocks you want Cold Turkey to have
     Suggest,
 }
 
@@ -1001,12 +1006,28 @@ fn main() {
                 cold_turkey.args(["-start", block_name]);
                 match password {
                     Some(p) => {
-                        cold_turkey.args(["-password", p]).spawn();
+                        match cold_turkey.args(["-password", p]).spawn() {
+                            Ok(_) => {
+                                println!("Starts blocking {} with a password", block_name);
+                                println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                            },
+                            Err(_) => {
+                                println!("Cannot run the command: ctk start --password. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                            }
+                        };
                     }
                     None => match subcommand {
                         Some(method) => match method {
                             ForSubcommands::For { minutes } => {
-                                cold_turkey.args(["-lock", &minutes.to_string()]).spawn();
+                                match cold_turkey.args(["-lock", &minutes.to_string()]).spawn() {
+                                    Ok(_) => {
+                                        println!("Starts blocking {} locked for {} minutes", block_name, minutes);
+                                        println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                                    },
+                                    Err(_) => {
+                                        println!("Cannot run the command: ctk start for. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                                    }
+                                };
                             }
                             ForSubcommands::Until { endtime, enddate } => {
                                 let datetime: DateTime<Local> = match enddate {
@@ -1042,17 +1063,41 @@ fn main() {
 
                                 let duration = datetime.signed_duration_since(Local::now());
                                 let minutes = f64::round(duration.num_seconds() as f64 / 60.0) as i64;
-                                cold_turkey.args(["-lock", &minutes.to_string()]).spawn();
+                                match cold_turkey.args(["-lock", &minutes.to_string()]).spawn() {
+                                    Ok(_) => {
+                                        println!("Starts blocking {} locked until {}", block_name, datetime.to_rfc2822());
+                                        println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                                    },
+                                    Err(_) => {
+                                        println!("Cannot run the command: ctk start until. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                                    }
+                                };
                             }
                         },
                         None => {
-                            cold_turkey.spawn();
+                            match cold_turkey.spawn() {
+                                Ok(_) => {
+                                    println!("Starts blocking {}", block_name);
+                                    println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                                },
+                                Err(_) => {
+                                    println!("Cannot run the command: ctk start. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                                }
+                            };
                         }
                     },
                 }
             }
             Command::Stop { block_name } => {
-                cold_turkey.args(["-stop", block_name]).spawn();
+                match cold_turkey.args(["-stop", block_name]).spawn() {
+                    Ok(_) => {
+                        println!("Stops blocking {}", block_name);
+                        println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                    },
+                    Err(_) => {
+                        println!("Cannot run the command: ctk stop. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                    }
+                };
             }
             Command::Add {
                 block_name,
@@ -1060,12 +1105,26 @@ fn main() {
                 except,
             } => {
                 let except_cmd: &str = if *except { "-exception" } else { "-web" };
-                cold_turkey
-                    .args(["-add", block_name, except_cmd, url])
-                    .spawn();
+                match cold_turkey.args(["-add", block_name, except_cmd, url]).spawn() {
+                    Ok(_) => {
+                        println!("Adds url {} to block {}", url, block_name);
+                        println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                    },
+                    Err(_) => {
+                        println!("Cannot run the command: ctk add. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                    }
+                }
             }
             Command::Toggle { block_name } => {
-                cold_turkey.args(["-toggle", block_name]).spawn();
+                match cold_turkey.args(["-toggle", block_name]).spawn() {
+                    Ok(_) => {
+                        println!("Toggles block {}", block_name);
+                        println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
+                    },
+                    Err(_) => {
+                        println!("Cannot run the command: ctk toggle. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+                    }
+                };
             }
             Command::Suggest => {
                 suggest();
@@ -1075,7 +1134,9 @@ fn main() {
             match cold_turkey.spawn() {
                 Ok(_) => println!("Launches Cold Turkey!"),
                 Err(_) => {
-                    println!("Failed to launch Cold Turkey. Make sure you have it installed.")
+                    println!(r"Looks like you don't have Cold Turkey installed on C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe");
+                    println!("If you do have it installed, please put Cold Turkey Blocker.exe in the folder mentioned.");
+                    println!("If not, you're welcome to download it at getcoldturkey.com.");
                 }
             };
         }
