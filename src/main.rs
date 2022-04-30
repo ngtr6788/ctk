@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_must_use, unused_imports, unused_variables)]
 use chrono::{
     Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, ParseResult, Timelike, TimeZone
 };
@@ -148,7 +147,7 @@ enum Suggest {
         lock: bool,
     },
     /// When set, blocks without breaks
-    NoBreak {
+    Nobreak {
         /// Name of your wishlist Cold Turkey block (see suggest list)
         block_name: String,
     },
@@ -187,6 +186,15 @@ enum Suggest {
         path_type: PathType,
         /// File path on a computer or URL of a website
         path: String,
+    },
+    /// Makes a block unscheduled and continuous
+    Continuous {
+        block_name: String,
+    },
+    /// Schedules a block's blocking time over a week
+    Schedule {
+        /// Name of your wishlist Cold Turkey block (see suggest list)
+        block_name: String
     },
     /// Shows all the settings of a block
     Settings {
@@ -290,7 +298,7 @@ struct BlockSettings {
     web: Vec<String>,
     exceptions: Vec<String>,
     apps: Vec<String>,
-    schedule: Vec<String>,
+    schedule: Vec<ScheduleBlock>,
     custom_users: Vec<String>,
 }
 
@@ -306,6 +314,16 @@ struct Window {
     lock: bool,
     start_time: String,
     end_time: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct ScheduleBlock {
+    id: usize,
+    start_time: String,
+    end_time: String,
+    #[serde(rename = "break")]
+    break_type: String,
 }
 
 impl BlockSettings {
@@ -486,7 +504,7 @@ fn suggest() {
                     None => println!("Block {} does not exist", block_name),
                 }
             }
-            Suggest::NoBreak { block_name } => match list_of_blocks.get_mut(&block_name) {
+            Suggest::Nobreak { block_name } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => {
                     bs.break_type = "none".to_owned();
                     println!("Blocks {} with no breaks", block_name)
@@ -619,6 +637,25 @@ fn suggest() {
                 },
                 None => println!("Block {} does not exist", &block_name),
             },
+            Suggest::Continuous { block_name } => {
+                match list_of_blocks.get_mut(&block_name) {
+                    Some(bs) => {
+                        bs.sched_type = SchedType::Continuous;
+                        println!("Made block {} to be blocked continously without schedule", &block_name);
+                    },
+                    None => println!("Block {} does not exist", block_name),
+                }
+            },
+            Suggest::Schedule { block_name } => {
+                match list_of_blocks.get_mut(&block_name) {
+                    Some(bs) => {
+                        bs.sched_type = SchedType::Scheduled;
+                        bs.schedule = schedule(&block_name);
+                        println!("Added a schedule to block {}", &block_name);
+                    },
+                    None => println!("Block {} does not exist", block_name),
+                }
+            },
             Suggest::Settings { block_name } => match list_of_blocks.get_mut(&block_name) {
                 Some(bs) => println!("{:?}", bs),
                 None => println!("Block {} does not exist", block_name),
@@ -668,6 +705,286 @@ fn suggest() {
             Suggest::Quit => break,
         }
     }
+}
+
+#[derive(Parser)]
+enum Schedule {
+    Add {
+        #[clap(parse(try_from_str = str_to_time))]
+        start_time: NaiveTime,
+        #[clap(parse(try_from_str = str_to_time))]
+        end_time: NaiveTime,
+        #[clap(long)]
+        sun: bool,
+        #[clap(long)]
+        mon: bool,
+        #[clap(long)]
+        tue: bool,
+        #[clap(long)]
+        wed: bool,
+        #[clap(long)]
+        thu: bool,
+        #[clap(long)]
+        fri: bool,
+        #[clap(long)]
+        sat: bool,
+        #[clap(long)]
+        wkday: bool,
+        #[clap(long)]
+        wkend: bool,
+        #[clap(short, long)]
+        all: bool,
+        #[clap(subcommand)]
+        break_type: ScheduleBreak,
+    },
+    Edit {
+        #[clap(long)]
+        id: usize,
+        #[clap(parse(try_from_str = str_to_day))]
+        day: Day,
+        #[clap(parse(try_from_str = str_to_time))]
+        start_time: NaiveTime,
+        #[clap(parse(try_from_str = str_to_time))]
+        end_time: NaiveTime,
+        #[clap(subcommand)]
+        break_type: ScheduleBreak,
+    },
+    Remove {
+        ids: Vec<usize>,
+        #[clap(long)]
+        all: bool,
+    },
+    Print,
+    Done,
+}
+
+#[derive(Subcommand)]
+enum Day {
+    Sun,
+    Mon,
+    Tue,
+    Wed,
+    Thu,
+    Fri,
+    Sat
+}
+
+fn str_to_day<'a, 'b>(s: &'a str) -> Result<Day, &'b str> {
+    match s {
+        "sun" => Ok(Day::Sun),
+        "mon" => Ok(Day::Mon),
+        "tue" => Ok(Day::Tue),
+        "wed" => Ok(Day::Wed),
+        "thu" => Ok(Day::Thu),
+        "fri" => Ok(Day::Fri),
+        "sat" => Ok(Day::Sat),
+        _ => Err("Not a valid day of the week. Must be sun, mon, tue, wed, thu, fri, sat")
+    }
+}
+
+#[derive(Subcommand)]
+enum ScheduleBreak {
+    /// When set, blocks without breaks
+    Nobreak,
+    /// Allows unblocked until time is up
+    Allowance {
+        /// How long to allow unblocked
+        allowance_minutes: u16,
+    },
+    /// Blocks for a certain time, then breaks for a certain time
+    Pomodoro {
+        /// How long for the block to be blocked
+        lock_minutes: u16,
+        /// How long for the block to relax its block
+        break_minutes: u16,
+    },
+}
+
+fn stdin_to_schedule(block_name: &str) -> Schedule {
+    loop {
+        print!(">> schedule [{}] ", &block_name);
+        io::stdout().flush();
+        let mut suggest_input: String = String::new();
+        match io::stdin().read_line(&mut suggest_input) {
+            Ok(_) => {
+                let shlex_parse: Option<Vec<String>> = shlex::split(&suggest_input);
+                match shlex_parse {
+                    Some(mut cmd_input) => {
+                        // For Windows, there is a carriage return at the very end,
+                        // so this should get rid of it
+                        if let Some(last) = cmd_input.last_mut() {
+                            *last = last.trim().to_string();
+                        };
+
+                        cmd_input.insert(0, "schedule".to_string());
+                        match Schedule::try_parse_from(cmd_input.into_iter()) {
+                            Ok(suggest_cmd) => {
+                                return suggest_cmd;
+                            }
+                            Err(clap_error) => {
+                                clap_error.print();
+                                continue;
+                            }
+                        }
+                    }
+                    None => {
+                        println!("Can't parse this command: pleasy try again.");
+                        continue;
+                    }
+                }
+            }
+            Err(_) => {
+                println!("Can't read any input: please try again.");
+                continue;
+            }
+        }
+    }
+}
+
+fn schedule(block_name: &str) -> Vec<ScheduleBlock> {
+    let mut final_schedule: Vec<ScheduleBlock> = Vec::new();
+
+    loop {
+        let schedule_cmd: Schedule = stdin_to_schedule(&block_name);
+
+        match schedule_cmd {
+            Schedule::Add { 
+                start_time, 
+                end_time, 
+                mut sun, 
+                mut mon, 
+                mut tue,
+                mut wed,
+                mut thu,
+                mut fri,
+                mut sat,
+                wkday,
+                wkend,
+                all,
+                break_type,     
+            } => {
+                let start_string_end = ",".to_owned() + &start_time.hour().to_string() + "," + &start_time.minute().to_string();
+                let end_string_end = ",".to_owned() + &end_time.hour().to_string() + "," + &end_time.minute().to_string();
+
+                let break_string = match break_type {
+                    ScheduleBreak::Nobreak => "none".to_string(),
+                    ScheduleBreak::Allowance { allowance_minutes } => allowance_minutes.to_string(),
+                    ScheduleBreak::Pomodoro { lock_minutes, break_minutes } => lock_minutes.to_string() + "," + &break_minutes.to_string(),
+                };
+
+                if all {
+                    sun = true;
+                    mon = true;
+                    tue = true;
+                    wed = true;
+                    thu = true;
+                    fri = true;
+                    sat = true;
+                }
+
+                if wkday {
+                    mon = true;
+                    tue = true;
+                    wed = true;
+                    thu = true;
+                    fri = true;
+                }
+
+                if wkend {
+                    sun = true;
+                    sat = true;
+                }
+
+                const NUM_OF_DAYS_IN_WEEK: usize = 7;
+                let days_of_week: [bool; NUM_OF_DAYS_IN_WEEK] = [sun, mon, tue, wed, thu, fri, sat];
+                for i in 0..NUM_OF_DAYS_IN_WEEK {
+                    if days_of_week[i] {
+                        let start_string = i.to_string() + &start_string_end;
+                        let end_string = i.to_string() + &end_string_end;
+
+                        let block = ScheduleBlock {
+                            id: final_schedule.len(),
+                            start_time: start_string,
+                            end_time: end_string,
+                            break_type: break_string.clone(),
+                        };
+    
+                        println!("Created a schedule block of index {}", final_schedule.len());
+                        final_schedule.push(block);
+                    }
+                }
+            },
+            Schedule::Edit {
+                id,
+                day,
+                start_time,
+                end_time,
+                break_type,
+            } => {
+                let start_string_end = ",".to_owned() + &start_time.hour().to_string() + "," + &start_time.minute().to_string();
+                let end_string_end = ",".to_owned() + &end_time.hour().to_string() + "," + &end_time.minute().to_string();
+
+                let break_string = match break_type {
+                    ScheduleBreak::Nobreak => "none".to_string(),
+                    ScheduleBreak::Allowance { allowance_minutes } => allowance_minutes.to_string(),
+                    ScheduleBreak::Pomodoro { lock_minutes, break_minutes } => lock_minutes.to_string() + "," + &break_minutes.to_string(),
+                };
+
+                let day_num = match day {
+                    Day::Sun => "0",
+                    Day::Mon => "1",
+                    Day::Tue => "2",
+                    Day::Wed => "3",
+                    Day::Thu => "4",
+                    Day::Fri => "5",
+                    Day::Sat => "6",
+                };
+
+                let block = ScheduleBlock {
+                    id: id,
+                    start_time: day_num.to_string() + &start_string_end,
+                    end_time: day_num.to_string() + &end_string_end,
+                    break_type: break_string.clone(),
+                };
+
+                final_schedule[id] = block;
+                println!("Edited schedule block {}", id);
+            }
+            Schedule::Remove { ids, all } => {
+                if all {
+                    final_schedule.clear();
+                    println!("Deleted all schedule blocks");
+                } else {
+                    let mut remove_element: Vec<bool> = vec![true; final_schedule.len()];
+                    for i in ids {
+                        println!("Deleted schedule blocks {}", i);
+                        remove_element[i] = false;
+                    }
+                    let mut iter = remove_element.iter();
+                    final_schedule.retain(|_| *iter.next().unwrap());
+                    for i in 0..final_schedule.len() {
+                        final_schedule[i].id = i;
+                    }
+                }
+            },
+            Schedule::Print => {
+                match serde_json::to_writer_pretty(io::stdout(), &final_schedule) {
+                    Ok(_) => {},
+                    Err(_) => print!("Could not print to stdout"),
+                }
+                print!("\n");
+            }
+            Schedule::Done => {
+                for i in 0..final_schedule.len() {
+                    final_schedule[i].id = i;
+                }
+                println!("Done with scheduling");
+                break;
+            }
+        }
+    }
+
+    return final_schedule;
 }
 
 fn main() {
