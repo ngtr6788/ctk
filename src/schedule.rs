@@ -266,6 +266,10 @@ pub fn schedule(block_name: &str) -> Vec<ScheduleBlock> {
                 end_time,
                 break_type,
             } => {
+                if id >= final_schedule.len() {
+                    println!("ID {} does not exist. Please choose an ID between 0 and {} inclusive", id, final_schedule.len() - 1);
+                    continue;
+                }
                 let start_string_end = ",".to_owned()
                     + &start_time.hour().to_string()
                     + ","

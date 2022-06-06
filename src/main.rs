@@ -1,3 +1,5 @@
+// Get rid of unused_must_use errors for now
+#![allow(unused_must_use)]
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{Parser, Subcommand};
 use std::process;
@@ -149,9 +151,13 @@ fn main() {
                                 };
 
                                 let duration = datetime.signed_duration_since(Local::now());
-                                let minutes =
-                                    f64::round(duration.num_seconds() as f64 / 60.0) as i64;
-                                match cold_turkey.args(["-lock", &minutes.to_string()]).spawn() {
+                                // If duration is exactly a multiple of 60, do not round up
+                                let duration_minutes = if duration.num_seconds() % 60 == 0 {
+                                    duration.num_minutes()
+                                } else {
+                                    duration.num_minutes() + 1
+                                };
+                                match cold_turkey.args(["-lock", &duration_minutes.to_string()]).spawn() {
                                     Ok(_) => {
                                         println!(
                                             "Starts blocking {} locked until {}",
