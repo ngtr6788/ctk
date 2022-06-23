@@ -1,5 +1,5 @@
 use chrono::{NaiveTime, Timelike};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ColorChoice};
 use rand::Rng;
 use rpassword;
 use serde::Serialize;
@@ -15,6 +15,7 @@ use std::path::Path;
 use crate::{convert, schedule};
 
 #[derive(Parser, Debug)]
+#[clap(color = ColorChoice::Never)]
 /// Suggests what blocks Cold Turkey should have
 enum Suggest {
     /// Creates a new block

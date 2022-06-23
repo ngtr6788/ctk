@@ -1,5 +1,5 @@
 use chrono::{NaiveTime, Timelike};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ColorChoice};
 use serde::Serialize;
 use std::io;
 use std::io::Write;
@@ -7,6 +7,7 @@ use std::io::Write;
 use crate::convert;
 
 #[derive(Parser)]
+#[clap(color = ColorChoice::Never)]
 /// Scheduling for a Cold Turkey block
 enum Schedule {
     /// Adds new scheduling blocks

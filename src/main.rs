@@ -1,7 +1,7 @@
 // Get rid of unused_must_use errors for now
 #![allow(unused_must_use)]
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ColorChoice};
 use std::process;
 
 pub mod convert;
@@ -12,7 +12,8 @@ pub mod suggest;
 #[clap(
     name = "ctk",
     author = "Nguyen Tran (GitHub: ngtr6788)",
-    version = "0.1.0"
+    version = "0.1.0",
+    color = ColorChoice::Never
 )]
 /// A better CLI interface for Cold Turkey.
 ///
