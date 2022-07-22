@@ -8,6 +8,7 @@ pub mod convert;
 pub mod schedule;
 // pub mod suggest;
 pub mod suggestdialog;
+pub mod blocksettings;
 
 #[derive(Parser)]
 #[clap(
