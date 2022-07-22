@@ -12,7 +12,7 @@ pub mod suggestdialog;
 #[clap(
     name = "ctk",
     author = "Nguyen Tran (GitHub: ngtr6788)",
-    version = "0.1.0",
+    version = "0.2.0",
     color = ColorChoice::Never
 )]
 /// A better CLI interface for Cold Turkey.
