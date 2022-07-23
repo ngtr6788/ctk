@@ -2,6 +2,7 @@
 #![allow(unused_must_use)]
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{ColorChoice, Parser, Subcommand};
+use dialoguer::Password;
 use std::process;
 
 pub mod blocksettings;
@@ -51,7 +52,7 @@ enum Command {
     block_name: String,
     #[clap(short, long)]
     /// Password to lock the block
-    password: Option<String>,
+    password: bool,
     #[clap(subcommand)]
     subcommand: Option<ForSubcommands>,
   },
@@ -92,8 +93,15 @@ fn main() {
       } => {
         cold_turkey.args(["-start", block_name]);
         match password {
-          Some(p) => {
-            match cold_turkey.args(["-password", p]).spawn() {
+          true => {
+            let p = loop {
+              match Password::new().with_prompt("Enter a password").interact() {
+                Ok(pass) => break pass,
+                Err(_) => continue,
+              }
+            };
+
+            match cold_turkey.args(["-password", &p]).spawn() {
               Ok(_) => {
                 println!("Starts blocking {} with a password", block_name);
                 println!("NOTE: Please make sure the block name exists because ctk can't check if it exists in Cold Turkey. However, don't worry. There are no known errors when you give a block name that doesn't exist.");
@@ -103,7 +111,7 @@ fn main() {
               }
             };
           }
-          None => match subcommand {
+          false => match subcommand {
             Some(method) => match method {
               ForSubcommands::For { minutes } => {
                 match cold_turkey.args(["-lock", &minutes.to_string()]).spawn() {
