@@ -25,7 +25,7 @@ pub struct BlockSettings {
   pub custom_users: Vec<String>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum BreakMethod {
   None,
   Allowance(u32),

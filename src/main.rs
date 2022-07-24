@@ -4,6 +4,7 @@ use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, Naive
 use clap::{ColorChoice, Parser, Subcommand};
 use dialoguer::Password;
 use std::process;
+use zeroize::Zeroizing;
 
 pub mod blocksettings;
 pub mod convert;
@@ -94,12 +95,12 @@ fn main() {
         cold_turkey.args(["-start", block_name]);
         match password {
           true => {
-            let p = loop {
+            let p = Zeroizing::new(loop {
               match Password::new().with_prompt("Enter a password").interact() {
                 Ok(pass) => break pass,
                 Err(_) => continue,
               }
-            };
+            });
 
             match cold_turkey.args(["-password", &p]).spawn() {
               Ok(_) => {
