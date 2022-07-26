@@ -95,12 +95,11 @@ impl Serialize for ScheduleTime {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum LockMethod {
   None,
-  Random,
-  #[serde(rename = "window")]
-  Range,
+  RandomText,
+  Window,
   Restart,
   Password,
 }

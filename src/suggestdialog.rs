@@ -307,7 +307,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
   match lock_method {
     1 => {
-      block_settings.lock = LockMethod::Random;
+      block_settings.lock = LockMethod::RandomText;
 
       let length: u32 = loop {
         match Input::new()
@@ -322,7 +322,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
       block_settings.random_text_length = length;
     }
     2 => {
-      block_settings.lock = LockMethod::Range;
+      block_settings.lock = LockMethod::Window;
 
       let start_time: NaiveTime = loop {
         match Input::new().with_prompt("Enter start time").interact_text() {
@@ -645,17 +645,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
       }
     }
 
-    if let Ok(new_dir) = env::current_dir() {
-      let new_current_dir = match new_dir.to_str() {
-        Some(string) => string.to_string(),
-        None => {
-          println!("Cannot print out the string of the current directory.");
-          return None;
-        }
-      };
-
-      env::set_current_dir(&original_curdir);
-    }
+    env::set_current_dir(&original_curdir);
   }
 
   let win10_blocks = loop {
