@@ -381,15 +381,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               env::set_current_dir(".");
             }
           } else if &shlex_parse[0] == "ls" {
-            let dir_to_look: PathBuf;
-            if shlex_parse.len() == 2 {
-              let path = PathBuf::from(&shlex_parse[1]);
-              dir_to_look = path;
-            } else {
-              dir_to_look = env::current_dir().unwrap()
-            }
-
-            let searched_directory = match dir_to_look.read_dir() {
+            let searched_directory = match current_dir.read_dir() {
               Ok(dir) => dir,
               Err(err) => {
                 println!("{}", err);
@@ -436,15 +428,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
               let mut vec_exe = Vec::new();
 
-              let cur_dir = match env::current_dir() {
-                Ok(dir) => dir,
-                Err(err) => {
-                  println!("{}", err);
-                  continue;
-                }
-              };
-
-              let mut exe_iterable = WalkDir::new(cur_dir)
+              let mut exe_iterable = WalkDir::new(current_dir)
                 .into_iter()
                 .filter_map(|e| e.ok())
                 .filter(|e| e.path().extension().unwrap_or_default() == "exe" || e.path().is_dir())
