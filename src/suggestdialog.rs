@@ -1,5 +1,6 @@
 use crate::blocksettings::{AppString, Day, ScheduleBlock, ScheduleTime};
 use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, SchedType};
+use crate::convert;
 use crate::loop_dialoguer::LoopDialogue;
 use chrono::NaiveTime;
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
@@ -250,6 +251,21 @@ fn break_method_from_stdin() -> BreakMethod {
   }
 }
 
+fn read_time_from_stdin<S: Into<String>>(prompt: S) -> NaiveTime {
+  let mut input: Input<String> = Input::new();
+  input.with_prompt(prompt);
+  loop {
+    let time_string: String = input.loop_interact();
+    match convert::str_to_time(&time_string) {
+      Ok(time) => break time,
+      Err(_) => {
+        eprintln!("Error in parsing the given time. Please try again.");
+        continue;
+      }
+    }
+  }
+}
+
 fn block_settings_from_stdin() -> Option<BlockSettings> {
   let mut block_settings = BlockSettings::new();
 
@@ -272,9 +288,9 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     2 => {
       block_settings.lock = LockMethod::Window;
 
-      let start_time: NaiveTime = Input::new().with_prompt("Enter start time").loop_interact();
+      let start_time: NaiveTime = read_time_from_stdin("Enter start time");
 
-      let end_time: NaiveTime = Input::new().with_prompt("Enter end time").loop_interact();
+      let end_time: NaiveTime = read_time_from_stdin("Enter end time");
 
       let lock_range: bool = Confirm::new()
         .with_prompt("Do you want to lock during that time range?")
@@ -543,9 +559,9 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
         .items(&TIMES_OF_WEEK)
         .loop_interact();
 
-      let start_time: NaiveTime = Input::new().with_prompt("Enter start time").loop_interact();
+      let start_time: NaiveTime = read_time_from_stdin("Enter start time");
 
-      let end_time: NaiveTime = Input::new().with_prompt("Enter end time").loop_interact();
+      let end_time: NaiveTime = read_time_from_stdin("Enter end time");
 
       let break_type = break_method_from_stdin();
 

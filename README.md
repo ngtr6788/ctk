@@ -117,7 +117,7 @@ You are now done with one block! If you want to add additional blocks, you are w
 ## Wishlist
 - [ ] Make this work on MacOS, since I don't have a MacOS device
 - [ ] Extend this README.md by writing a walk-through for `ctk suggest`
-- [ ] Improve on taking in datetime input 
+- [x] Improve on taking in datetime input 
 - [ ] Work on handling Ctrl + C (Keyboard Interrupts)
 - [ ] Improve on the interface for adding executables, applications and folders (user input and looks)
 - [ ] Save `ctk suggest` progress if things go wrong so users can go back and continue where they left off
