@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 use crate::blocksettings::{AppString, Day, ScheduleBlock, ScheduleTime};
 use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, SchedType};
 use crate::loop_dialoguer::LoopDialogue;
