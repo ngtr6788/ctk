@@ -468,41 +468,44 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
               find_progress_bar.finish_and_clear();
 
-              let mut sort_initial_progress: u64 = 10000;
-              let mut number_of_comparisons: u64 = 0;
-              let sort_progress_bar = ProgressBar::new(sort_initial_progress);
+              if vec_exe.len() != 0 {
+                let mut sort_initial_progress: u64 = 10000;
+                let mut number_of_comparisons: u64 = 0;
+                let sort_progress_bar = ProgressBar::new(sort_initial_progress);
 
-              sort_progress_bar.println("Sorting matches by best match ...");
-              sort_progress_bar
-                .set_style(ProgressStyle::default_bar().template("{pos} sorts done [ETA: {eta}]"));
+                sort_progress_bar.println("Sorting matches by best match ...");
+                sort_progress_bar.set_style(
+                  ProgressStyle::default_bar().template("{pos} sorts done [ETA: {eta}]"),
+                );
 
-              vec_exe.sort_by(|a, b| {
-                sort_progress_bar.inc(1);
-                number_of_comparisons += 1;
-                if number_of_comparisons > sort_initial_progress {
-                  sort_initial_progress *= 2;
-                  sort_progress_bar.set_length(sort_initial_progress);
-                }
-                return best_match(&keyword, b)
-                  .unwrap()
-                  .cmp(&best_match(&keyword, a).unwrap());
-              });
-              sort_progress_bar.finish_and_clear();
+                vec_exe.sort_by(|a, b| {
+                  sort_progress_bar.inc(1);
+                  number_of_comparisons += 1;
+                  if number_of_comparisons > sort_initial_progress {
+                    sort_initial_progress *= 2;
+                    sort_progress_bar.set_length(sort_initial_progress);
+                  }
+                  return best_match(&keyword, b)
+                    .unwrap()
+                    .cmp(&best_match(&keyword, a).unwrap());
+                });
+                sort_progress_bar.finish_and_clear();
 
-              let choose_exes = MultiSelect::new()
-                .with_prompt("Given the keyword, which executables do you want to block? [press space to select]")
-                .items(&vec_exe)
-                .loop_interact();
+                let choose_exes = MultiSelect::new()
+                  .with_prompt("Given the keyword, which executables do you want to block? [press space to select]")
+                  .items(&vec_exe)
+                  .loop_interact();
 
-              choose_exes.into_iter().for_each(|i| {
-                let s = vec_exe[i].replace("\\", "/");
-                let path = PathBuf::from(&s);
-                if path.is_dir() {
-                  block_settings.apps.push(AppString::Folder(s));
-                } else if path.is_file() {
-                  block_settings.apps.push(AppString::File(s));
-                }
-              });
+                choose_exes.into_iter().for_each(|i| {
+                  let s = vec_exe[i].replace("\\", "/");
+                  let path = PathBuf::from(&s);
+                  if path.is_dir() {
+                    block_settings.apps.push(AppString::Folder(s));
+                  } else if path.is_file() {
+                    block_settings.apps.push(AppString::File(s));
+                  }
+                });
+              }
             }
           } else if &shlex_parse[0] == "done" || &shlex_parse[0] == "quit" || &shlex_parse[0] == "q"
           {
