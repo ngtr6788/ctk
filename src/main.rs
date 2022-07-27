@@ -8,6 +8,7 @@ use zeroize::Zeroizing;
 
 pub mod blocksettings;
 pub mod convert;
+pub mod loop_dialoguer;
 pub mod suggestdialog;
 
 #[derive(Parser)]

@@ -2,6 +2,7 @@
 
 use crate::blocksettings::{AppString, Day, ScheduleBlock, ScheduleTime};
 use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, SchedType};
+use crate::loop_dialoguer::LoopDialogue;
 use chrono::NaiveTime;
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -14,8 +15,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use sublime_fuzzy::{FuzzySearch, Match, Scoring};
 use walkdir::WalkDir;
-
-// NOTE TO SELF: I'm still merely prototyping here. That's why there are so many unwraps and allows stuff everywhere
 
 const WIN10_APPS: [&str; 99] = [
   "3DViewer.exe",
@@ -149,17 +148,9 @@ fn best_match(query: &str, target: &str) -> Option<Match> {
 
 fn new_block_name() -> String {
   // Ask the user for the Cold Turkey block name
-  let block_name: String = loop {
-    match Input::<String>::new()
-      .with_prompt("Enter a new Cold Turkey block name")
-      .interact_text()
-    {
-      Ok(name) => break name,
-      Err(_) => continue,
-    }
-  };
-
-  block_name
+  Input::<String>::new()
+    .with_prompt("Enter a new Cold Turkey block name")
+    .loop_interact()
 }
 
 pub fn suggest() {
@@ -171,16 +162,10 @@ pub fn suggest() {
   }
 
   loop {
-    let continue_settings = match Confirm::new()
+    let continue_settings = Confirm::new()
       .with_prompt("Do you want to add new blocks?")
-      .interact()
-    {
-      Ok(x) => x,
-      Err(err) => {
-        println!("{}", err);
-        continue;
-      }
-    };
+      .loop_interact();
+
     if continue_settings {
       let block_name = new_block_name();
       if let Some(block_settings) = block_settings_from_stdin() {
@@ -191,27 +176,15 @@ pub fn suggest() {
     }
   }
 
-  let save_to_file = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to save these settings in a .ctbbl file?")
-      .interact()
-    {
-      Ok(save) => break save,
-      Err(_) => continue,
-    }
-  };
+  let save_to_file = Confirm::new()
+    .with_prompt("Do you want to save these settings in a .ctbbl file?")
+    .loop_interact();
 
   if save_to_file {
-    let file_name: String = loop {
-      match Input::new()
-        .with_prompt("Enter a new file name [empty string to create random name]")
-        .allow_empty(true)
-        .interact_text()
-      {
-        Ok(text) => break text,
-        Err(_) => continue,
-      }
-    };
+    let file_name: String = Input::new()
+      .with_prompt("Enter a new file name [empty string to create random name]")
+      .allow_empty(true)
+      .loop_interact();
 
     let final_file: String = if file_name != "" {
       format!("{}.ctbbl", file_name)
@@ -239,50 +212,27 @@ pub fn suggest() {
 
 fn break_method_from_stdin() -> BreakMethod {
   // Ask the user if they want no breaks, allowance or pomodoro
-  let allowance_method = loop {
-    match Select::new()
-      .with_prompt("Choose a break method")
-      .items(&ALLOWANCE_OPTIONS)
-      .interact()
-    {
-      Ok(opt) => break opt,
-      Err(_) => continue,
-    }
-  };
+  let allowance_method = Select::new()
+    .with_prompt("Choose a break method")
+    .items(&ALLOWANCE_OPTIONS)
+    .loop_interact();
 
   match allowance_method {
     1 => {
-      let allow_minutes: u32 = loop {
-        match Input::new()
-          .with_prompt("Enter allowance minutes")
-          .interact_text()
-        {
-          Ok(min) => break min,
-          Err(_) => continue,
-        }
-      };
+      let allow_minutes: u32 = Input::new()
+        .with_prompt("Enter allowance minutes")
+        .loop_interact();
 
       BreakMethod::Allowance(allow_minutes)
     }
     2 => {
-      let block_minutes: u32 = loop {
-        match Input::new()
-          .with_prompt("Enter block minutes")
-          .interact_text()
-        {
-          Ok(min) => break min,
-          Err(_) => continue,
-        }
-      };
-      let break_minutes: u32 = loop {
-        match Input::new()
-          .with_prompt("Enter break minutes")
-          .interact_text()
-        {
-          Ok(min) => break min,
-          Err(_) => continue,
-        }
-      };
+      let block_minutes: u32 = Input::new()
+        .with_prompt("Enter block minutes")
+        .loop_interact();
+
+      let break_minutes: u32 = Input::new()
+        .with_prompt("Enter break minutes")
+        .loop_interact();
 
       BreakMethod::Pomodoro(block_minutes, break_minutes)
     }
@@ -294,59 +244,31 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
   let mut block_settings = BlockSettings::new();
 
   // Ask the user to select a lock option
-  let lock_method = loop {
-    match Select::new()
-      .with_prompt("Choose a lock method")
-      .items(&LOCK_OPTIONS)
-      .interact()
-    {
-      Ok(method) => break method,
-      Err(_) => continue,
-    }
-  };
+  let lock_method = Select::new()
+    .with_prompt("Choose a lock method")
+    .items(&LOCK_OPTIONS)
+    .loop_interact();
 
   match lock_method {
     1 => {
       block_settings.lock = LockMethod::RandomText;
 
-      let length: u32 = loop {
-        match Input::new()
-          .with_prompt("Enter a random string length")
-          .interact_text()
-        {
-          Ok(l) => break l,
-          Err(_) => continue,
-        }
-      };
+      let length: u32 = Input::new()
+        .with_prompt("Enter a random string length")
+        .loop_interact();
 
       block_settings.random_text_length = length;
     }
     2 => {
       block_settings.lock = LockMethod::Window;
 
-      let start_time: NaiveTime = loop {
-        match Input::new().with_prompt("Enter start time").interact_text() {
-          Ok(time) => break time,
-          Err(_) => continue,
-        }
-      };
+      let start_time: NaiveTime = Input::new().with_prompt("Enter start time").loop_interact();
 
-      let end_time: NaiveTime = loop {
-        match Input::new().with_prompt("Enter end time").interact_text() {
-          Ok(time) => break time,
-          Err(_) => continue,
-        }
-      };
+      let end_time: NaiveTime = Input::new().with_prompt("Enter end time").loop_interact();
 
-      let lock_range: bool = loop {
-        match Confirm::new()
-          .with_prompt("Do you want to lock during that time range?")
-          .interact()
-        {
-          Ok(lock) => break lock,
-          Err(_) => continue,
-        }
-      };
+      let lock_range: bool = Confirm::new()
+        .with_prompt("Do you want to lock during that time range?")
+        .loop_interact();
 
       block_settings.window = RangeWindow {
         lock_range,
@@ -357,27 +279,18 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     3 => {
       block_settings.lock = LockMethod::Restart;
 
-      let restart_unblock: bool = loop {
-        match Confirm::new()
-          .with_prompt("Do you want the block to be unblocked after a restart?")
-          .interact()
-        {
-          Ok(restart) => break restart,
-          Err(_) => continue,
-        }
-      };
+      let restart_unblock: bool = Confirm::new()
+        .with_prompt("Do you want the block to be unblocked after a restart?")
+        .loop_interact();
 
       block_settings.restart_unblock = restart_unblock;
     }
     4 => {
       block_settings.lock = LockMethod::Password;
 
-      let password = loop {
-        match Password::new().with_prompt("Enter a password").interact() {
-          Ok(pass) => break pass,
-          Err(_) => continue,
-        }
-      };
+      let password = Password::new()
+        .with_prompt("Enter a password")
+        .loop_interact();
 
       block_settings.password = password;
     }
@@ -389,29 +302,18 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
   block_settings.break_type = break_method_from_stdin();
 
   // Ask the user if they want add websites to the blocklist or not
-  let website_block: bool = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to add websites to the blocklist?")
-      .interact()
-    {
-      Ok(web_bloc) => break web_bloc,
-      Err(_) => continue,
-    }
-  };
+  let website_block: bool = Confirm::new()
+    .with_prompt("Do you want to add websites to the blocklist?")
+    .loop_interact();
 
   if website_block {
     // Ask the user to add new websites
     loop {
-      let website: String = loop {
-        match Input::new()
-          .with_prompt("Add a new website [press empty string to exit]")
-          .allow_empty(true)
-          .interact_text()
-        {
-          Ok(site) => break site,
-          Err(_) => continue,
-        }
-      };
+      let website: String = Input::new()
+        .with_prompt("Add a new website [press empty string to exit]")
+        .allow_empty(true)
+        .loop_interact();
+
       if website.is_empty() {
         break;
       }
@@ -421,45 +323,25 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
   }
 
   // Ask the user if they want to add websites to the list of exceptions or not
-  let website_exception: bool = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to add websites to the exceptions list?")
-      .interact()
-    {
-      Ok(web_bloc) => break web_bloc,
-      Err(_) => continue,
-    }
-  };
+  let website_exception: bool = Confirm::new()
+    .with_prompt("Do you want to add websites to the exceptions list?")
+    .loop_interact();
+
   // If so, continously add websites until user types empty string
   if website_exception {
     loop {
-      let website: String = loop {
-        match Input::new()
-          .with_prompt("Add a new website [press empty string to exit]")
-          .allow_empty(true)
-          .interact_text()
-        {
-          Ok(web) => break web,
-          Err(_) => continue,
-        }
-      };
-      if website.is_empty() {
-        break;
-      }
+      let website: String = Input::new()
+        .with_prompt("Add a new website [press empty string to exit]")
+        .allow_empty(true)
+        .loop_interact();
 
       block_settings.exceptions.push(website);
     }
   }
 
-  let app_block = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to add executables or folders to the block?")
-      .interact()
-    {
-      Ok(app_bloc) => break app_bloc,
-      Err(_) => continue,
-    }
-  };
+  let app_block = Confirm::new()
+    .with_prompt("Do you want to add executables or folders to the block?")
+    .loop_interact();
 
   if app_block {
     let original_curdir = match env::current_dir() {
@@ -522,19 +404,12 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               .collect();
 
             if apps_list.len() != 0 {
-              let idxs = match MultiSelect::new()
+              let idxs = MultiSelect::new()
                 .with_prompt(
                   "Which executable or folder would you like to add? [press space to select]",
                 )
                 .items(&apps_list)
-                .interact()
-              {
-                Ok(indexes) => indexes,
-                Err(err) => {
-                  println!("{}", err);
-                  continue;
-                }
-              };
+                .loop_interact();
 
               idxs.into_iter().for_each(|i| {
                 let s = apps_list[i].replace("\\", "/");
@@ -614,16 +489,10 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               });
               sort_progress_bar.finish_and_clear();
 
-              let choose_exes = match MultiSelect::new()
+              let choose_exes = MultiSelect::new()
                 .with_prompt("Given the keyword, which executables do you want to block? [press space to select]")
                 .items(&vec_exe)
-                .interact() {
-                  Ok(exes) => exes,
-                  Err(err) => {
-                    println!("{}", err);
-                    continue;
-                  }
-              };
+                .loop_interact();
 
               choose_exes.into_iter().for_each(|i| {
                 let s = vec_exe[i].replace("\\", "/");
@@ -648,33 +517,15 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     env::set_current_dir(&original_curdir);
   }
 
-  let win10_blocks = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to add Windows 10 applications or not?")
-      .interact()
-    {
-      Ok(block) => break block,
-      Err(err) => {
-        println!("{}", err);
-        continue;
-      }
-    }
-  };
+  let win10_blocks = Confirm::new()
+    .with_prompt("Do you want to add Windows 10 applications or not?")
+    .loop_interact();
 
   if win10_blocks {
-    let win10_choice = loop {
-      match MultiSelect::new()
-        .with_prompt("Choose your Windows 10 apps")
-        .items(&WIN10_APPS)
-        .interact()
-      {
-        Ok(choice) => break choice,
-        Err(err) => {
-          println!("{}", err);
-          continue;
-        }
-      }
-    };
+    let win10_choice = MultiSelect::new()
+      .with_prompt("Choose your Windows 10 apps")
+      .items(&WIN10_APPS)
+      .loop_interact();
 
     win10_choice.into_iter().for_each(|i| {
       block_settings
@@ -683,34 +534,17 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     });
   }
 
-  let allow_window_title = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to block windows with certain titles?")
-      .interact()
-    {
-      Ok(allow) => break allow,
-      Err(err) => {
-        println!("{}", err);
-        continue;
-      }
-    }
-  };
+  let allow_window_title = Confirm::new()
+    .with_prompt("Do you want to block windows with certain titles?")
+    .loop_interact();
 
   if allow_window_title {
     loop {
-      let window: String = loop {
-        match Input::new()
-          .with_prompt("Add a new window title [press empty string to exit]")
-          .allow_empty(true)
-          .interact_text()
-        {
-          Ok(w) => break w,
-          Err(err) => {
-            println!("{}", err);
-            continue;
-          }
-        }
-      };
+      let window: String = Input::new()
+        .with_prompt("Add a new window title [press empty string to exit]")
+        .allow_empty(true)
+        .loop_interact();
+
       if window.is_empty() {
         break;
       }
@@ -719,67 +553,29 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     }
   }
 
-  let schedule_block = loop {
-    match Confirm::new()
-      .with_prompt("Do you want to add a schedule to your blocks?")
-      .interact()
-    {
-      Ok(block) => break block,
-      Err(err) => {
-        println!("{}", err);
-        continue;
-      }
-    }
-  };
+  let schedule_block = Confirm::new()
+    .with_prompt("Do you want to add a schedule to your blocks?")
+    .loop_interact();
 
   if schedule_block {
     block_settings.sched_type = SchedType::Scheduled;
     loop {
-      let add_sched = loop {
-        match Confirm::new()
-          .with_prompt("Do you want to add new schedule blocks?")
-          .interact()
-        {
-          Ok(add) => break add,
-          Err(err) => {
-            println!("{}", err);
-            continue;
-          }
-        }
-      };
+      let add_sched = Confirm::new()
+        .with_prompt("Do you want to add new schedule blocks?")
+        .loop_interact();
 
       if !add_sched {
         break;
       }
 
-      let time_of_week = match MultiSelect::new()
+      let time_of_week = MultiSelect::new()
         .with_prompt("Choose the times of the week applied")
         .items(&TIMES_OF_WEEK)
-        .interact()
-      {
-        Ok(time) => time,
-        Err(err) => {
-          println!("{}", err);
-          continue;
-        }
-      };
+        .loop_interact();
 
-      let start_time: NaiveTime = match Input::new().with_prompt("Enter start time").interact_text()
-      {
-        Ok(time) => time,
-        Err(err) => {
-          println!("{}", err);
-          continue;
-        }
-      };
+      let start_time: NaiveTime = Input::new().with_prompt("Enter start time").loop_interact();
 
-      let end_time: NaiveTime = match Input::new().with_prompt("Enter end time").interact_text() {
-        Ok(time) => time,
-        Err(err) => {
-          println!("{}", err);
-          continue;
-        }
-      };
+      let end_time: NaiveTime = Input::new().with_prompt("Enter end time").loop_interact();
 
       let break_type = break_method_from_stdin();
 
