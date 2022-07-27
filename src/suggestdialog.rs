@@ -503,7 +503,8 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
             break;
           }
         } else {
-          break;
+          eprintln!("");
+          continue;
         }
       }
     }
