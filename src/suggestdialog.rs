@@ -8,6 +8,7 @@ use rand::Rng;
 use shlex;
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Display;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
@@ -154,24 +155,17 @@ fn new_block_name() -> String {
 pub fn suggest() {
   let mut list_of_blocks: HashMap<String, BlockSettings> = HashMap::new();
 
-  let block_name = new_block_name();
-  if let Some(block_settings) = block_settings_from_stdin() {
-    list_of_blocks.insert(block_name, block_settings);
-  }
+  let mut continue_settings = true;
 
-  loop {
-    let continue_settings = Confirm::new()
+  while continue_settings {
+    let block_name = new_block_name();
+    if let Some(block_settings) = block_settings_from_stdin() {
+      list_of_blocks.insert(block_name, block_settings);
+    }
+
+    continue_settings = Confirm::new()
       .with_prompt("Do you want to add new blocks?")
       .loop_interact();
-
-    if continue_settings {
-      let block_name = new_block_name();
-      if let Some(block_settings) = block_settings_from_stdin() {
-        list_of_blocks.insert(block_name, block_settings);
-      }
-    } else {
-      break;
-    }
   }
 
   let save_to_file = Confirm::new()
@@ -206,6 +200,24 @@ pub fn suggest() {
       }
     }
   }
+}
+
+fn read_string_until_empty<S: Display>(prompt: S) -> Vec<String> {
+  let mut string_vec = Vec::new();
+  loop {
+    let s: String = Input::new()
+      .with_prompt(format!("{} [press empty string to exit]", prompt))
+      .allow_empty(true)
+      .loop_interact();
+
+    if s.is_empty() {
+      break;
+    }
+
+    string_vec.push(s);
+  }
+
+  string_vec
 }
 
 fn break_method_from_stdin() -> BreakMethod {
@@ -305,19 +317,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     .loop_interact();
 
   if website_block {
-    // Ask the user to add new websites
-    loop {
-      let website: String = Input::new()
-        .with_prompt("Add a new website [press empty string to exit]")
-        .allow_empty(true)
-        .loop_interact();
-
-      if website.is_empty() {
-        break;
-      }
-
-      block_settings.web.push(website);
-    }
+    block_settings.web = read_string_until_empty("Add a new website");
   }
 
   // Ask the user if they want to add websites to the list of exceptions or not
@@ -327,14 +327,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
   // If so, continously add websites until user types empty string
   if website_exception {
-    loop {
-      let website: String = Input::new()
-        .with_prompt("Add a new website [press empty string to exit]")
-        .allow_empty(true)
-        .loop_interact();
-
-      block_settings.exceptions.push(website);
-    }
+    block_settings.exceptions = read_string_until_empty("Add a new website");
   }
 
   let app_block = Confirm::new()
@@ -524,18 +517,10 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     .loop_interact();
 
   if allow_window_title {
-    loop {
-      let window: String = Input::new()
-        .with_prompt("Add a new window title [press empty string to exit]")
-        .allow_empty(true)
-        .loop_interact();
-
-      if window.is_empty() {
-        break;
-      }
-
-      block_settings.apps.push(AppString::Title(window));
-    }
+    block_settings.apps = read_string_until_empty("Add a new window title")
+      .into_iter()
+      .map(|w| AppString::Title(w))
+      .collect();
   }
 
   let schedule_block = Confirm::new()
