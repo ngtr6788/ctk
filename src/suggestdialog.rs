@@ -533,10 +533,11 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     .loop_interact();
 
   if allow_window_title {
-    block_settings.apps = read_string_until_empty("Add a new window title")
+    let mut window_titles: Vec<AppString> = read_string_until_empty("Add a new window title")
       .into_iter()
       .map(|w| AppString::Title(w))
       .collect();
+    block_settings.apps.append(&mut window_titles);
   }
 
   let schedule_block = Confirm::new()
