@@ -12,8 +12,8 @@ pub struct BlockSettings {
   #[serde(serialize_with = "bool_str_serialize")]
   pub restart_unblock: bool,
   pub password: String,
-  #[serde(serialize_with = "u32_str_serialize")]
-  pub random_text_length: u32,
+  #[serde(serialize_with = "u16_str_serialize")]
+  pub random_text_length: u16,
   #[serde(rename = "break")]
   pub break_type: BreakMethod,
   pub window: RangeWindow,
@@ -28,8 +28,8 @@ pub struct BlockSettings {
 #[derive(Debug, Clone)]
 pub enum BreakMethod {
   None,
-  Allowance(u32),
-  Pomodoro(u32, u32),
+  Allowance(u8),
+  Pomodoro(u8, u8),
 }
 
 impl Serialize for BreakMethod {
@@ -53,44 +53,62 @@ impl Serialize for BreakMethod {
 pub struct ScheduleBlock {
   #[serde(serialize_with = "usize_str_serialize")]
   pub id: usize,
-  pub start_time: ScheduleTime,
-  pub end_time: ScheduleTime,
+  pub start_time: ScheduleTimeTuple,
+  pub end_time: ScheduleTimeTuple,
   #[serde(rename = "break")]
   pub break_type: BreakMethod,
 }
 
+// #[derive(Debug)]
+// pub struct ScheduleTime {
+//   pub day_of_week: Day,
+//   pub time: NaiveTime,
+// }
+
+// #[derive(Debug, Copy, Clone)]
+// pub enum Day {
+//   Sun,
+//   Mon,
+//   Tue,
+//   Wed,
+//   Thu,
+//   Fri,
+//   Sat,
+// }
+
+// impl Serialize for ScheduleTime {
+//   fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+//     let day_int: u8 = match &self.day_of_week {
+//       Day::Sun => 0,
+//       Day::Mon => 1,
+//       Day::Tue => 2,
+//       Day::Wed => 3,
+//       Day::Thu => 4,
+//       Day::Fri => 5,
+//       Day::Sat => 6,
+//     };
+
+//     let schedule_time_str = format!("{},{},{}", day_int, self.time.hour(), self.time.minute());
+
+//     serializer.serialize_str(&schedule_time_str)
+//   }
+// }
+
 #[derive(Debug)]
-pub struct ScheduleTime {
-  pub day_of_week: Day,
-  pub time: NaiveTime,
+pub struct ScheduleTimeTuple(usize, u32, u32);
+
+impl ScheduleTimeTuple {
+  // It's a tuple, why bother with new? It's for better communication.
+  pub fn new(day_of_week: usize, hour: u32, minute: u32) -> Self {
+    ScheduleTimeTuple(day_of_week, hour, minute)
+  }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum Day {
-  Sun,
-  Mon,
-  Tue,
-  Wed,
-  Thu,
-  Fri,
-  Sat,
-}
-
-impl Serialize for ScheduleTime {
+impl Serialize for ScheduleTimeTuple {
   fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-    let day_int: u8 = match &self.day_of_week {
-      Day::Sun => 0,
-      Day::Mon => 1,
-      Day::Tue => 2,
-      Day::Wed => 3,
-      Day::Thu => 4,
-      Day::Fri => 5,
-      Day::Sat => 6,
-    };
+    let sched_str = format!("{},{},{}", self.0, self.1, self.2);
 
-    let schedule_time_str = format!("{},{},{}", day_int, self.time.hour(), self.time.minute());
-
-    serializer.serialize_str(&schedule_time_str)
+    serializer.serialize_str(&sched_str)
   }
 }
 
@@ -199,9 +217,9 @@ fn bool_str_serialize<S: Serializer>(my_bool: &bool, serializer: S) -> Result<S:
   serializer.serialize_str(&bool_str)
 }
 
-fn u32_str_serialize<S: Serializer>(num: &u32, serializer: S) -> Result<S::Ok, S::Error> {
-  let u32_str = num.to_string();
-  serializer.serialize_str(&u32_str)
+fn u16_str_serialize<S: Serializer>(num: &u16, serializer: S) -> Result<S::Ok, S::Error> {
+  let u16_str = num.to_string();
+  serializer.serialize_str(&u16_str)
 }
 
 fn usize_str_serialize<S: Serializer>(num: &usize, serializer: S) -> Result<S::Ok, S::Error> {

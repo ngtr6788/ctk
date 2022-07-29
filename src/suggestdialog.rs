@@ -1,8 +1,8 @@
-use crate::blocksettings::{AppString, Day, ScheduleBlock, ScheduleTime};
+use crate::blocksettings::{AppString, ScheduleBlock, ScheduleTimeTuple};
 use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, SchedType};
 use crate::convert;
 use crate::loop_dialoguer::LoopDialogue;
-use chrono::NaiveTime;
+use chrono::{NaiveTime, Timelike};
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::Rng;
@@ -228,21 +228,32 @@ fn break_method_from_stdin() -> BreakMethod {
     .items(&ALLOWANCE_OPTIONS)
     .loop_interact();
 
+  let minute_validator = |i: &u8| -> Result<(), &str> {
+    if &0 <= i && i <= &99 {
+      Ok(())
+    } else {
+      Err("Input must be between 0 and 99 minutes inclusive")
+    }
+  };
+
   match allowance_method {
     1 => {
-      let allow_minutes: u32 = Input::new()
+      let allow_minutes: u8 = Input::new()
         .with_prompt("Enter allowance minutes")
+        .validate_with(minute_validator)
         .loop_interact();
 
       BreakMethod::Allowance(allow_minutes)
     }
     2 => {
-      let block_minutes: u32 = Input::new()
+      let block_minutes: u8 = Input::new()
         .with_prompt("Enter block minutes")
+        .validate_with(minute_validator)
         .loop_interact();
 
-      let break_minutes: u32 = Input::new()
+      let break_minutes: u8 = Input::new()
         .with_prompt("Enter break minutes")
+        .validate_with(minute_validator)
         .loop_interact();
 
       BreakMethod::Pomodoro(block_minutes, break_minutes)
@@ -279,8 +290,15 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
     1 => {
       block_settings.lock = LockMethod::RandomText;
 
-      let length: u32 = Input::new()
+      let length: u16 = Input::new()
         .with_prompt("Enter a random string length")
+        .validate_with(|i: &u16| -> Result<(), &str> {
+          if &0 <= i && i <= &999 {
+            Ok(())
+          } else {
+            Err("Random string length must be between 0 and 999 inclusive.")
+          }
+        })
         .loop_interact();
 
       block_settings.random_text_length = length;
@@ -561,34 +579,54 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
         .items(&TIMES_OF_WEEK)
         .loop_interact();
 
-      let start_time: NaiveTime = read_time_from_stdin("Enter start time");
+      let mut start_time: NaiveTime;
+      let mut end_time: NaiveTime;
 
-      let end_time: NaiveTime = read_time_from_stdin("Enter end time");
+      let midnight: NaiveTime = NaiveTime::from_hms(0, 0, 0);
+
+      loop {
+        loop {
+          start_time = read_time_from_stdin("Enter start time");
+
+          if start_time.minute() % 5 == 0 {
+            break;
+          } else {
+            eprintln!("The minute time must be in multiples of 5");
+            continue;
+          }
+        }
+
+        loop {
+          end_time = read_time_from_stdin("Enter end time");
+
+          if end_time.minute() % 5 == 0 {
+            break;
+          } else {
+            eprintln!("The minute time must be in multiples of 5");
+            continue;
+          }
+        }
+
+        if end_time == midnight || start_time < end_time {
+          break;
+        } else {
+          eprintln!("End time must either be after the start time, or end time is midnight");
+        }
+      }
 
       let break_type = break_method_from_stdin();
 
       time_of_week.into_iter().for_each(|i| {
-        let day_of_week: Day = match i {
-          0 => Day::Sun,
-          1 => Day::Mon,
-          2 => Day::Tue,
-          3 => Day::Wed,
-          4 => Day::Thu,
-          5 => Day::Fri,
-          6 => Day::Sat,
-          _ => Day::Sun,
-        };
+        let mut end_day_int = i;
+        // If end_time is midnight, we "go to the next day"
+        if end_time == midnight {
+          end_day_int += 1;
+        }
 
         block_settings.schedule.push(ScheduleBlock {
           id: block_settings.schedule.len(),
-          start_time: ScheduleTime {
-            day_of_week,
-            time: start_time,
-          },
-          end_time: ScheduleTime {
-            day_of_week,
-            time: end_time,
-          },
+          start_time: ScheduleTimeTuple::new(i, start_time.hour(), start_time.minute()),
+          end_time: ScheduleTimeTuple::new(end_day_int, end_time.hour(), end_time.minute()),
           break_type: break_type.clone(),
         });
       });
