@@ -122,6 +122,7 @@ You are now done with one block! If you want to add additional blocks, you are w
 - [ ] Improve on the interface for adding executables, applications and folders (user input and looks)
     - [ ] Completion on tab
     - [ ] History with arrow keys
+- [ ] Add input validation (e.g. random text length)
 - [ ] Save `ctk suggest` progress if things go wrong so users can go back and continue where they left off
 - [x] ~~Improve on `ctk start` password input~~
 - [ ] Ask other people for any contributions, ideas, feedback, etc.
