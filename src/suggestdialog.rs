@@ -179,7 +179,7 @@ pub fn suggest() {
       .allow_empty(true)
       .loop_interact();
 
-    let final_file: String = if file_name != "" {
+    let final_file: String = if !file_name.is_empty() {
       format!("{}.ctbbl", file_name)
     } else {
       let num: u64 = rand::thread_rng().gen();
@@ -402,7 +402,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               .map(|e| e.path().to_str().unwrap().to_string())
               .collect();
 
-            if apps_list.len() != 0 {
+            if !apps_list.is_empty() {
               let idxs = MultiSelect::new()
                 .with_prompt(
                   "Which executable or folder would you like to add? [press space to select]",
@@ -440,7 +440,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                 .filter_map(|e| e.ok())
                 .filter(|e| e.path().extension().unwrap_or_default() == "exe" || e.path().is_dir())
                 .filter(|e| e.path().to_str().is_some())
-                .filter(|e| best_match(&keyword, e.path().to_str().unwrap()).is_some())
+                .filter(|e| best_match(keyword, e.path().to_str().unwrap()).is_some())
                 .map(|e| e.path().to_str().unwrap().to_string());
 
               loop {
@@ -459,7 +459,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
               find_progress_bar.finish_and_clear();
 
-              if vec_exe.len() != 0 {
+              if !vec_exe.is_empty() {
                 let mut sort_initial_progress: u64 = 10000;
                 let mut number_of_comparisons: u64 = 0;
                 let sort_progress_bar = ProgressBar::new(sort_initial_progress);
@@ -476,9 +476,9 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                     sort_initial_progress *= 2;
                     sort_progress_bar.set_length(sort_initial_progress);
                   }
-                  return best_match(&keyword, b)
+                  best_match(keyword, b)
                     .unwrap()
-                    .cmp(&best_match(&keyword, a).unwrap());
+                    .cmp(&best_match(keyword, a).unwrap())
                 });
                 sort_progress_bar.finish_and_clear();
 
@@ -503,7 +503,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
             break;
           }
         } else {
-          eprintln!("");
+          eprintln!();
           continue;
         }
       }
@@ -536,7 +536,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
   if allow_window_title {
     let mut window_titles: Vec<AppString> = read_string_until_empty("Add a new window title")
       .into_iter()
-      .map(|w| AppString::Title(w))
+      .map(AppString::Title)
       .collect();
     block_settings.apps.append(&mut window_titles);
   }
@@ -583,11 +583,11 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
           id: block_settings.schedule.len(),
           start_time: ScheduleTime {
             day_of_week,
-            time: start_time.clone(),
+            time: start_time,
           },
           end_time: ScheduleTime {
             day_of_week,
-            time: end_time.clone(),
+            time: end_time,
           },
           break_type: break_type.clone(),
         });

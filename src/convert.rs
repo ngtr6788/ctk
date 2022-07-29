@@ -8,7 +8,7 @@ pub fn str_to_time(s: &str) -> ParseResult<NaiveTime> {
       Err(_) => continue,
     }
   }
-  return NaiveTime::parse_from_str(s, ALLOWED_PARSE[0]);
+  NaiveTime::parse_from_str(s, ALLOWED_PARSE[0])
 }
 
 pub fn str_to_date(s: &str) -> ParseResult<NaiveDate> {
@@ -21,5 +21,5 @@ pub fn str_to_date(s: &str) -> ParseResult<NaiveDate> {
       Err(_) => continue,
     }
   }
-  return NaiveDate::parse_from_str(s, ALLOWED_PARSE[0]);
+  NaiveDate::parse_from_str(s, ALLOWED_PARSE[0])
 }

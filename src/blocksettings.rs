@@ -184,7 +184,13 @@ impl BlockSettings {
       schedule: Vec::new(),
       custom_users: Vec::new(),
     };
-    return new_settings;
+    new_settings
+  }
+}
+
+impl Default for BlockSettings {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
