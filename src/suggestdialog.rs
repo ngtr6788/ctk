@@ -1,6 +1,7 @@
 use crate::blocksettings::{AppString, ScheduleBlock, ScheduleTimeTuple};
 use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, SchedType};
 use crate::convert;
+use crate::historydeque::HistoryDeque;
 use crate::loop_dialoguer::LoopDialogue;
 use chrono::{NaiveTime, Timelike};
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
@@ -382,12 +383,17 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
         return None;
       }
     };
+
+    let mut hist = HistoryDeque::<String>::new();
+
     loop {
       if let Ok(current_dir) = env::current_dir() {
         println!("{}", current_dir.display());
 
-        let cmd_result: Result<String, std::io::Error> =
-          Input::new().with_prompt(">").interact_text();
+        let cmd_result: Result<String, std::io::Error> = Input::new()
+          .with_prompt(">")
+          .history_with(&mut hist)
+          .interact_text();
 
         if let Ok(cmd) = cmd_result {
           let shlex_parse: Vec<String> = match shlex::split(&cmd) {

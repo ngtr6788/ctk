@@ -116,13 +116,13 @@ You are now done with one block! If you want to add additional blocks, you are w
 
 ## Wishlist
 - [ ] Make this work on MacOS, since I don't have a MacOS device
-- [ ] Extend this README.md by writing a walk-through for `ctk suggest`
+- [x] Extend this README.md by writing a walk-through for `ctk suggest` (partially done)
 - [x] ~~Improve on taking in datetime input~~
 - [ ] Work on handling Ctrl + C (Keyboard Interrupts)
 - [ ] Improve on the interface for adding executables, applications and folders (user input and looks)
     - [ ] Completion on tab
-    - [ ] History with arrow keys
-- [ ] Add input validation (e.g. random text length)
+    - [x] History with arrow keys
+- [x] Add input validation (e.g. random text length)
 - [ ] Save `ctk suggest` progress if things go wrong so users can go back and continue where they left off
 - [x] ~~Improve on `ctk start` password input~~
 - [ ] Ask other people for any contributions, ideas, feedback, etc.
