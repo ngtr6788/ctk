@@ -139,6 +139,14 @@ const LOCK_OPTIONS: [&str; 5] = [
 
 const ALLOWANCE_OPTIONS: [&str; 3] = ["No Breaks", "Allowance", "Pomodoro"];
 
+struct MatchString(Match, String);
+
+impl ToString for MatchString {
+  fn to_string(&self) -> String {
+    self.1.clone()
+  }
+}
+
 fn best_match(query: &str, target: &str) -> Option<Match> {
   let scoring = Scoring::new(50, 0, 20, 0);
   return FuzzySearch::new(query, target)
@@ -421,9 +429,9 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
             };
             let apps_list: Vec<String> = searched_directory
               .filter_map(|e| e.ok())
-              .filter(|e| e.path().extension().unwrap_or_default() == "exe" || e.path().is_dir())
-              .filter(|e| e.path().to_str().is_some())
-              .map(|e| e.path().to_str().unwrap().to_string())
+              .map(|dir| dir.path())
+              .filter(|path| path.extension().unwrap_or_default() == "exe" || path.is_dir())
+              .filter_map(|path| path.into_os_string().into_string().ok())
               .collect();
 
             if !apps_list.is_empty() {
@@ -462,10 +470,10 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               let mut exe_iterable = WalkDir::new(current_dir)
                 .into_iter()
                 .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().unwrap_or_default() == "exe" || e.path().is_dir())
-                .filter(|e| e.path().to_str().is_some())
-                .filter(|e| best_match(keyword, e.path().to_str().unwrap()).is_some())
-                .map(|e| e.path().to_str().unwrap().to_string());
+                .map(|dir| dir.into_path())
+                .filter(|path| path.extension().unwrap_or_default() == "exe" || path.is_dir())
+                .filter_map(|path| path.into_os_string().into_string().ok())
+                .filter(|path_str| best_match(keyword, &path_str).is_some());
 
               loop {
                 if let Some(exe) = exe_iterable.next() {
