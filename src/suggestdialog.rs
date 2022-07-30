@@ -3,6 +3,7 @@ use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, 
 use crate::convert;
 use crate::historydeque::HistoryDeque;
 use crate::loop_dialoguer::LoopDialogue;
+use crate::matchstring::MatchString;
 use chrono::{NaiveTime, Timelike};
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -138,14 +139,6 @@ const LOCK_OPTIONS: [&str; 5] = [
 ];
 
 const ALLOWANCE_OPTIONS: [&str; 3] = ["No Breaks", "Allowance", "Pomodoro"];
-
-struct MatchString(Match, String);
-
-impl ToString for MatchString {
-  fn to_string(&self) -> String {
-    self.1.clone()
-  }
-}
 
 fn best_match(query: &str, target: &str) -> Option<Match> {
   let scoring = Scoring::new(50, 0, 20, 0);
@@ -465,7 +458,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               );
               find_progress_bar.println("Finding possible matches ...");
 
-              let mut vec_exe = Vec::new();
+              let mut matchstring_vec = Vec::new();
 
               let mut exe_iterable = WalkDir::new(current_dir)
                 .into_iter()
@@ -473,17 +466,22 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                 .map(|dir| dir.into_path())
                 .filter(|path| path.extension().unwrap_or_default() == "exe" || path.is_dir())
                 .filter_map(|path| path.into_os_string().into_string().ok())
-                .filter(|path_str| best_match(keyword, &path_str).is_some());
+                .filter_map(|path_str| {
+                  best_match(keyword, &path_str).map(|m| MatchString {
+                    match_object: m,
+                    string: path_str,
+                  })
+                });
 
               loop {
                 if let Some(exe) = exe_iterable.next() {
-                  vec_exe.push(exe);
+                  matchstring_vec.push(exe);
                   find_progress_bar.inc(1);
                 } else {
                   break;
                 }
 
-                if vec_exe.len() as u64 > initial_count {
+                if matchstring_vec.len() as u64 > initial_count {
                   initial_count *= 2;
                   find_progress_bar.set_length(initial_count);
                 }
@@ -491,7 +489,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
               find_progress_bar.finish_and_clear();
 
-              if !vec_exe.is_empty() {
+              if !matchstring_vec.is_empty() {
                 let mut sort_initial_progress: u64 = 10000;
                 let mut number_of_comparisons: u64 = 0;
                 let sort_progress_bar = ProgressBar::new(sort_initial_progress);
@@ -501,26 +499,24 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                   ProgressStyle::default_bar().template("{pos} sorts done [ETA: {eta}]"),
                 );
 
-                vec_exe.sort_by(|a, b| {
+                matchstring_vec.sort_by(|a, b| {
                   sort_progress_bar.inc(1);
                   number_of_comparisons += 1;
                   if number_of_comparisons > sort_initial_progress {
                     sort_initial_progress *= 2;
                     sort_progress_bar.set_length(sort_initial_progress);
                   }
-                  best_match(keyword, b)
-                    .unwrap()
-                    .cmp(&best_match(keyword, a).unwrap())
+                  b.cmp(a)
                 });
                 sort_progress_bar.finish_and_clear();
 
                 let choose_exes = MultiSelect::new()
                   .with_prompt("Given the keyword, which executables do you want to block? [press space to select]")
-                  .items(&vec_exe)
+                  .items(&matchstring_vec)
                   .loop_interact();
 
                 choose_exes.into_iter().for_each(|i| {
-                  let s = vec_exe[i].replace("\\", "/");
+                  let s = matchstring_vec[i].string.replace("\\", "/");
                   let path = PathBuf::from(&s);
                   if path.is_dir() {
                     block_settings.apps.push(AppString::Folder(s));

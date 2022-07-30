@@ -10,6 +10,7 @@ pub mod blocksettings;
 pub mod convert;
 pub mod historydeque;
 pub mod loop_dialoguer;
+pub mod matchstring;
 pub mod suggestdialog;
 
 #[derive(Parser)]
