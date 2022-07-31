@@ -231,7 +231,7 @@ fn break_method_from_stdin() -> BreakMethod {
     .loop_interact();
 
   let minute_validator = |i: &u8| -> Result<(), &str> {
-    if &0 <= i && i <= &99 {
+    if (0..=99).contains(i) {
       Ok(())
     } else {
       Err("Input must be between 0 and 99 minutes inclusive")
@@ -295,7 +295,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
       let length: u16 = Input::new()
         .with_prompt("Enter a random string length")
         .validate_with(|i: &u16| -> Result<(), &str> {
-          if &0 <= i && i <= &999 {
+          if (0..=999).contains(i) {
             Ok(())
           } else {
             Err("Random string length must be between 0 and 999 inclusive.")

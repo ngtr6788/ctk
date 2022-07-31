@@ -18,14 +18,16 @@ where
   T: Display + Clone,
 {
   fn read(&self, pos: usize) -> Option<String> {
-    if let Some(val) = self.deque.get(pos) {
-      Some(val.to_string())
-    } else {
-      None
-    }
+    self.deque.get(pos).map(|val| val.to_string())
   }
 
   fn write(&mut self, val: &T) {
     self.deque.push_front(val.clone());
+  }
+}
+
+impl<T> Default for HistoryDeque<T> {
+  fn default() -> Self {
+    Self::new()
   }
 }
