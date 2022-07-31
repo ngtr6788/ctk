@@ -15,5 +15,6 @@ rand = "0.8.5"
 dialoguer = { version = "0.10.0", features = ["history"] }
 walkdir = "2.3.2"
 sublime_fuzzy = "0.7.0"
-indicatif = "0.16.2"
+indicatif = { version = "0.16.2", features = ["rayon"] }
 zeroize = "1.5.7"
+rayon = "1.5.3"

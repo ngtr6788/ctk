@@ -6,8 +6,9 @@ use crate::loop_dialoguer::LoopDialogue;
 use crate::matchstring::MatchString;
 use chrono::{NaiveTime, Timelike};
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rand::Rng;
+use rayon::prelude::*;
 use shlex;
 use std::collections::HashMap;
 use std::env;
@@ -15,6 +16,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Instant;
 use sublime_fuzzy::{FuzzySearch, Match, Scoring};
 use walkdir::WalkDir;
 
@@ -448,20 +450,19 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
           } else if &shlex_parse[0] == "search" {
             if shlex_parse.len() == 2 {
               let keyword = &shlex_parse[1];
-              let mut initial_count = 500;
+              let initial_count = 500;
 
               let find_progress_bar = ProgressBar::new(initial_count);
 
               find_progress_bar.set_style(
-                ProgressStyle::default_bar()
-                  .template("{wide_bar} Found {pos} executables and folders [ETA: {eta}]"),
+                ProgressStyle::default_bar().template("Found {pos} executables and folders"),
               );
               find_progress_bar.println("Finding possible matches ...");
 
-              let mut matchstring_vec = Vec::new();
-
-              let mut exe_iterable = WalkDir::new(current_dir)
+              let time = Instant::now();
+              let exe_iterable = WalkDir::new(current_dir)
                 .into_iter()
+                .par_bridge()
                 .filter_map(|e| e.ok())
                 .map(|dir| dir.into_path())
                 .filter(|path| path.extension().unwrap_or_default() == "exe" || path.is_dir())
@@ -471,45 +472,14 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                     match_object: m,
                     string: path_str,
                   })
-                });
+                })
+                .progress_with(find_progress_bar);
 
-              loop {
-                if let Some(exe) = exe_iterable.next() {
-                  matchstring_vec.push(exe);
-                  find_progress_bar.inc(1);
-                } else {
-                  break;
-                }
+              let mut matchstring_vec: Vec<MatchString> = exe_iterable.collect();
+              matchstring_vec.par_sort_unstable_by(|a, b| b.cmp(a));
 
-                if matchstring_vec.len() as u64 > initial_count {
-                  initial_count *= 2;
-                  find_progress_bar.set_length(initial_count);
-                }
-              }
-
-              find_progress_bar.finish_and_clear();
-
+              eprintln!("Searched in {}s", time.elapsed().as_secs_f32());
               if !matchstring_vec.is_empty() {
-                let mut sort_initial_progress: u64 = 10000;
-                let mut number_of_comparisons: u64 = 0;
-                let sort_progress_bar = ProgressBar::new(sort_initial_progress);
-
-                sort_progress_bar.println("Sorting matches by best match ...");
-                sort_progress_bar.set_style(
-                  ProgressStyle::default_bar().template("{pos} sorts done [ETA: {eta}]"),
-                );
-
-                matchstring_vec.sort_by(|a, b| {
-                  sort_progress_bar.inc(1);
-                  number_of_comparisons += 1;
-                  if number_of_comparisons > sort_initial_progress {
-                    sort_initial_progress *= 2;
-                    sort_progress_bar.set_length(sort_initial_progress);
-                  }
-                  b.cmp(a)
-                });
-                sort_progress_bar.finish_and_clear();
-
                 let choose_exes = MultiSelect::new()
                   .with_prompt("Given the keyword, which executables do you want to block? [press space to select]")
                   .items(&matchstring_vec)
