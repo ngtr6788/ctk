@@ -450,14 +450,12 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
           } else if &shlex_parse[0] == "search" {
             if shlex_parse.len() == 2 {
               let keyword = &shlex_parse[1];
-              let initial_count = 500;
 
-              let find_progress_bar = ProgressBar::new(initial_count);
+              let find_progress_bar = ProgressBar::new(0);
 
-              find_progress_bar.set_style(
-                ProgressStyle::default_bar().template("Found {pos} executables and folders"),
-              );
-              find_progress_bar.println("Finding possible matches ...");
+              find_progress_bar.set_style(ProgressStyle::default_bar().template(
+                "{spinner} Found {pos} executables and folders - elapsed time: {elapsed}",
+              ));
 
               let time = Instant::now();
               let exe_iterable = WalkDir::new(current_dir)
