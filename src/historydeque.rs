@@ -18,7 +18,7 @@ where
   T: Display + Clone,
 {
   fn read(&self, pos: usize) -> Option<String> {
-    self.deque.get(pos).map(|val| val.to_string())
+    self.deque.get(pos).map(std::string::ToString::to_string)
   }
 
   fn write(&mut self, val: &T) {

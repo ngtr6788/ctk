@@ -422,7 +422,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               }
             };
             let apps_list: Vec<String> = searched_directory
-              .filter_map(|e| e.ok())
+              .filter_map(std::result::Result::ok)
               .map(|dir| dir.path())
               .filter(|path| path.extension().unwrap_or_default() == "exe" || path.is_dir())
               .filter_map(|path| path.into_os_string().into_string().ok())
@@ -436,7 +436,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                 .items(&apps_list)
                 .loop_interact();
 
-              idxs.into_iter().for_each(|i| {
+              for i in idxs {
                 let s = apps_list[i].replace('\\', "/");
                 let path = PathBuf::from(&s);
                 if path.is_dir() {
@@ -444,7 +444,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                 } else if path.is_file() {
                   block_settings.apps.push(AppString::File(s));
                 }
-              });
+              }
             }
           } else if &shlex_parse[0] == "search" {
             if shlex_parse.len() == 2 {
@@ -460,8 +460,8 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
               let exe_iterable = WalkDir::new(current_dir)
                 .into_iter()
                 .par_bridge()
-                .filter_map(|e| e.ok())
-                .map(|dir| dir.into_path())
+                .filter_map(std::result::Result::ok)
+                .map(walkdir::DirEntry::into_path)
                 .filter(|path| path.extension().unwrap_or_default() == "exe" || path.is_dir())
                 .filter_map(|path| path.into_os_string().into_string().ok())
                 .filter_map(|path_str| {
@@ -482,7 +482,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                   .items(&matchstring_vec)
                   .loop_interact();
 
-                choose_exes.into_iter().for_each(|i| {
+                for i in choose_exes {
                   let s = matchstring_vec[i].string.replace('\\', "/");
                   let path = PathBuf::from(&s);
                   if path.is_dir() {
@@ -490,7 +490,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                   } else if path.is_file() {
                     block_settings.apps.push(AppString::File(s));
                   }
-                });
+                }
               }
             }
           } else if &shlex_parse[0] == "done" || &shlex_parse[0] == "quit" || &shlex_parse[0] == "q"
@@ -517,11 +517,11 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
       .items(&WIN10_APPS)
       .loop_interact();
 
-    win10_choice.into_iter().for_each(|i| {
+    for i in win10_choice {
       block_settings
         .apps
         .push(AppString::Win10(WIN10_APPS[i].to_string()));
-    });
+    }
   }
 
   let allow_window_title = Confirm::new()
@@ -593,7 +593,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
       let break_type = break_method_from_stdin();
 
-      time_of_week.into_iter().for_each(|i| {
+      for i in time_of_week {
         let mut end_day_int = i;
         // If end_time is midnight, we "go to the next day"
         if end_time == midnight {
@@ -606,7 +606,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
           end_time: ScheduleTimeTuple::new(end_day_int, end_time.hour(), end_time.minute()),
           break_type: break_type.clone(),
         });
-      });
+      }
     }
   } else {
     block_settings.sched_type = SchedType::Continuous;
