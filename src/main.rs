@@ -131,6 +131,15 @@ fn main() {
         cold_turkey.args(["-start", block_name]);
         match password {
           true => {
+            if let Some(settings) = &ct_settings {
+              if settings.is_pro == "free" {
+                eprintln!("ERROR: Cannot start a block with a password as a free user. Consider upgrading to pro.");
+                return;
+              }
+            } else {
+              eprintln!("WARNING: Cannot check if user is a pro user or not right now.");
+            }
+
             let p = Zeroizing::new(loop {
               match Password::new().with_prompt("Enter a password").interact() {
                 Ok(pass) => break pass,
