@@ -163,10 +163,10 @@ impl Serialize for AppString {
   fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
     let app_string: String = match self {
       AppString::File(path) => {
-        format!("file:{}", path.replace("\\", "/"))
+        format!("file:{}", path.replace('\\', "/"))
       }
       AppString::Folder(path) => {
-        format!("folder:{}", path.replace("\\", "/"))
+        format!("folder:{}", path.replace('\\', "/"))
       }
       AppString::Win10(string) => {
         format!("win10:{}", string)

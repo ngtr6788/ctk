@@ -9,7 +9,6 @@ use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rand::Rng;
 use rayon::prelude::*;
-use shlex;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::Display;
@@ -438,7 +437,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                 .loop_interact();
 
               idxs.into_iter().for_each(|i| {
-                let s = apps_list[i].replace("\\", "/");
+                let s = apps_list[i].replace('\\', "/");
                 let path = PathBuf::from(&s);
                 if path.is_dir() {
                   block_settings.apps.push(AppString::Folder(s));
@@ -484,7 +483,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
                   .loop_interact();
 
                 choose_exes.into_iter().for_each(|i| {
-                  let s = matchstring_vec[i].string.replace("\\", "/");
+                  let s = matchstring_vec[i].string.replace('\\', "/");
                   let path = PathBuf::from(&s);
                   if path.is_dir() {
                     block_settings.apps.push(AppString::Folder(s));
