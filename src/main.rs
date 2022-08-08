@@ -102,24 +102,6 @@ fn main() {
       Err(_) => None,
     };
 
-  let check_block_exists_then_succeed = |block_name: &str, success_message: String| {
-    if let Some(settings) = &ct_settings {
-      if !settings.block_list_info.blocks.contains_key(block_name) {
-        eprintln!(
-          "ERROR: Block {} cannot be found in your Cold Turkey application",
-          block_name
-        );
-        return;
-      }
-    } else {
-      eprintln!(
-        "WARNING: ctk cannot check if block {} is in your Cold Turkey application right now",
-        block_name
-      );
-    }
-    eprintln!("{}", success_message);
-  };
-
   let args = ColdTurkey::parse();
   match &args.command {
     Some(cmd) => match &cmd {
@@ -127,193 +109,256 @@ fn main() {
         block_name,
         password,
         subcommand,
-      } => {
-        cold_turkey.args(["-start", block_name]);
-        match password {
-          true => {
-            if let Some(settings) = &ct_settings {
-              if settings.is_pro == "free" {
-                eprintln!("ERROR: Cannot start a block with a password as a free user. Consider upgrading to pro.");
-                return;
-              }
-            } else {
-              eprintln!("WARNING: Cannot check if user is a pro user or not right now.");
+      } => match password {
+        true => start_block_with_password(block_name, &mut cold_turkey, &ct_settings),
+        false => match subcommand {
+          Some(method) => match method {
+            ForSubcommands::For { minutes } => {
+              start_block_for_some_minutes(block_name, *minutes, &mut cold_turkey, &ct_settings);
             }
-
-            let p = Zeroizing::new(loop {
-              match Password::new().with_prompt("Enter a password").interact() {
-                Ok(pass) => break pass,
-                Err(_) => continue,
-              }
-            });
-
-            match cold_turkey.args(["-password", &p]).spawn() {
-              Ok(_) => {
-                check_block_exists_then_succeed(
-                  block_name,
-                  format!("SUCCESS: Starts blocking {} with a password", block_name),
-                );
-              }
-              Err(_) => {
-                eprintln!("ERROR: Cannot run `ctk start --password`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-              }
-            };
-          }
-          false => match subcommand {
-            Some(method) => match method {
-              ForSubcommands::For { minutes } => {
-                match cold_turkey.args(["-lock", &minutes.to_string()]).spawn() {
-                  Ok(_) => {
-                    check_block_exists_then_succeed(
-                      block_name,
-                      format!(
-                        "SUCCESS: Starts blocking {} locked for {} minutes",
-                        block_name, minutes
-                      ),
-                    );
-                  }
-                  Err(_) => {
-                    eprintln!("ERROR: Cannot run `ctk start for`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-                  }
-                };
-              }
-              ForSubcommands::Until { endtime, enddate } => {
-                let datetime: DateTime<Local> = match enddate {
-                  Some(date) => {
-                    let naive_datetime: NaiveDateTime = date.and_time(*endtime);
-                    let datetime_result: LocalResult<DateTime<Local>> =
-                      Local.from_local_datetime(&naive_datetime);
-                    match datetime_result {
-                      LocalResult::None => {
-                        eprintln!("ERROR: Can't get the datetime specified.");
-                        return;
-                      }
-                      LocalResult::Single(datetime) => datetime,
-                      LocalResult::Ambiguous(_, _) => {
-                        eprintln!(
-                            "ERROR: Datetime given is ambiguous. Maybe try to be more clear in your time?"
-                          );
-                        return;
-                      }
-                    }
-                  }
-                  None => {
-                    let today: Date<Local> = Local::today();
-                    let today_time_option: Option<DateTime<Local>> = today.and_time(*endtime);
-                    match today_time_option {
-                      Some(datetime) => datetime,
-                      None => {
-                        eprintln!("ERROR: The date is assumed to be today, however, the time given seems to make it invalid.");
-                        return;
-                      }
-                    }
-                  }
-                };
-
-                let duration = datetime.signed_duration_since(Local::now());
-                // If duration is exactly a multiple of 60, do not round up
-                let duration_minutes = if duration.num_seconds() % 60 == 0 {
-                  duration.num_minutes()
-                } else {
-                  duration.num_minutes() + 1
-                };
-                match cold_turkey
-                  .args(["-lock", &duration_minutes.to_string()])
-                  .spawn()
-                {
-                  Ok(_) => {
-                    check_block_exists_then_succeed(
-                      block_name,
-                      format!(
-                        "SUCCESS: Starts blocking {} locked until {}",
-                        block_name,
-                        datetime.format("%H:%M %B %d %Y")
-                      ),
-                    );
-                  }
-                  Err(_) => {
-                    eprintln!("ERROR: Cannot run `ctk start until`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-                  }
-                };
-              }
-            },
-            None => {
-              match cold_turkey.spawn() {
-                Ok(_) => {
-                  check_block_exists_then_succeed(
-                    block_name,
-                    format!("SUCCESS: Starts blocking {}", block_name),
-                  );
-                }
-                Err(_) => {
-                  eprintln!("ERROR: Cannot run `ctk start`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-                }
-              };
+            ForSubcommands::Until { endtime, enddate } => {
+              start_block_until_time(
+                block_name,
+                *endtime,
+                *enddate,
+                &mut cold_turkey,
+                &ct_settings,
+              );
             }
           },
-        }
-      }
-      Command::Stop { block_name } => {
-        match cold_turkey.args(["-stop", block_name]).spawn() {
-          Ok(_) => {
-            check_block_exists_then_succeed(
-              block_name,
-              format!("SUCCESS: Stops blocking {}", block_name),
-            );
-          }
-          Err(_) => {
-            eprintln!("ERROR: Cannot run `ctk stop`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-          }
-        };
-      }
+          None => start_block_unlocked(block_name, &mut cold_turkey, &ct_settings),
+        },
+      },
+      Command::Stop { block_name } => stop_block(block_name, &mut cold_turkey, &ct_settings),
       Command::Add {
         block_name,
         url,
         except,
-      } => {
-        let except_cmd: &str = if *except { "-exception" } else { "-web" };
-        match cold_turkey
-          .args(["-add", block_name, except_cmd, url])
-          .spawn()
-        {
-          Ok(_) => {
-            check_block_exists_then_succeed(
-              block_name,
-              format!("SUCCESS: Adds url {} to block {}", url, block_name),
-            );
-          }
-          Err(_) => {
-            eprintln!("ERROR: Cannot run `ctk add`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-          }
-        }
-      }
-      Command::Toggle { block_name } => {
-        match cold_turkey.args(["-toggle", block_name]).spawn() {
-          Ok(_) => {
-            check_block_exists_then_succeed(
-              block_name,
-              format!("SUCCESS: Toggles block {}", block_name),
-            );
-          }
-          Err(_) => {
-            eprintln!("ERROR: Cannot run `ctk toggle`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
-          }
-        };
-      }
+      } => add_websites_to_block(block_name, url, *except, &mut cold_turkey, &ct_settings),
+      Command::Toggle { block_name } => toggle_block(block_name, &mut cold_turkey, &ct_settings),
       Command::Suggest => {
         suggestdialog::suggest();
       }
     },
-    None => {
-      if cold_turkey.spawn().is_ok() {
-        eprintln!("SUCCESS: Launches Cold Turkey!");
-      } else {
-        eprintln!(
-          r"ERROR: Looks like you don't have Cold Turkey installed on C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe"
-        );
-        eprintln!("If you do have it installed, please put Cold Turkey Blocker.exe in the folder mentioned.");
-        eprintln!("If not, you're welcome to download it at getcoldturkey.com.");
+    None => open_cold_turkey(&mut cold_turkey),
+  }
+}
+
+fn check_if_block_exists(
+  block_name: &str,
+  ct_settings: &Option<ColdTurkeySettings>,
+) -> Option<bool> {
+  if let Some(settings) = &ct_settings {
+    if settings.block_list_info.blocks.contains_key(block_name) {
+      Some(true)
+    } else {
+      eprintln!(
+        "ERROR: Block {} cannot be found in your Cold Turkey application",
+        block_name
+      );
+      Some(false)
+    }
+  } else {
+    eprintln!(
+      "WARNING: ctk cannot check if block {} is in your Cold Turkey application right now",
+      block_name
+    );
+    None
+  }
+}
+
+fn start_block_with_password(
+  block_name: &str,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  if let Some(settings) = &ct_settings {
+    if settings.is_pro == "free" {
+      eprintln!(
+        "ERROR: Cannot start a block with a password as a free user. Consider upgrading to pro."
+      );
+      return;
+    }
+  } else {
+    eprintln!("WARNING: Cannot check if user is a pro user or not right now.");
+  }
+
+  let p = Zeroizing::new(loop {
+    match Password::new().with_prompt("Enter a password").interact() {
+      Ok(pass) => break pass,
+      Err(_) => continue,
+    }
+  });
+
+  if cold_turkey
+    .args(["-start", block_name, "-password", &p])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!("SUCCESS: Starts blocking {} with a password", block_name);
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk start --password`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn start_block_for_some_minutes(
+  block_name: &str,
+  minutes: u32,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  if cold_turkey
+    .args(["-start", block_name, "-lock", &minutes.to_string()])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!(
+        "SUCCESS: Starts blocking {} locked for {} minutes",
+        block_name, minutes
+      );
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk start for`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn start_block_until_time(
+  block_name: &str,
+  endtime: NaiveTime,
+  enddate: Option<NaiveDate>,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  let datetime: DateTime<Local> = match enddate {
+    Some(date) => {
+      let naive_datetime: NaiveDateTime = date.and_time(endtime);
+      let datetime_result: LocalResult<DateTime<Local>> =
+        Local.from_local_datetime(&naive_datetime);
+      match datetime_result {
+        LocalResult::None => {
+          eprintln!("ERROR: Can't get the datetime specified.");
+          return;
+        }
+        LocalResult::Single(datetime) => datetime,
+        LocalResult::Ambiguous(_, _) => {
+          eprintln!("ERROR: Datetime given is ambiguous. Maybe try to be more clear in your time?");
+          return;
+        }
       }
     }
+    None => {
+      let today: Date<Local> = Local::today();
+      let today_time_option: Option<DateTime<Local>> = today.and_time(endtime);
+      match today_time_option {
+        Some(datetime) => datetime,
+        None => {
+          eprintln!("ERROR: The date is assumed to be today, however, the time given seems to make it invalid.");
+          return;
+        }
+      }
+    }
+  };
+
+  let duration = datetime.signed_duration_since(Local::now());
+  // If duration is exactly a multiple of 60, do not round up
+  let duration_minutes = if duration.num_seconds() % 60 == 0 {
+    duration.num_minutes()
+  } else {
+    duration.num_minutes() + 1
+  };
+  if cold_turkey
+    .args(["-start", block_name, "-lock", &duration_minutes.to_string()])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!(
+        "SUCCESS: Starts blocking {} locked until {}",
+        block_name,
+        datetime.format("%H:%M %B %d %Y")
+      );
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk start until`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn start_block_unlocked(
+  block_name: &str,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  if cold_turkey.args(["-start", block_name]).spawn().is_ok() {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!("SUCCESS: Starts blocking {}", block_name);
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk start`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn stop_block(
+  block_name: &str,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  if cold_turkey.args(["-stop", block_name]).spawn().is_ok() {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!("SUCCESS: Stops blocking {}", block_name);
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk stop`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn add_websites_to_block(
+  block_name: &str,
+  url: &str,
+  except: bool,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  let except_cmd: &str = if except { "-exception" } else { "-web" };
+  if cold_turkey
+    .args(["-add", block_name, except_cmd, url])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!("SUCCESS: Adds url {} to block {}", url, block_name);
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk add`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn toggle_block(
+  block_name: &str,
+  cold_turkey: &mut process::Command,
+  ct_settings: &Option<ColdTurkeySettings>,
+) {
+  if cold_turkey.args(["-toggle", block_name]).spawn().is_ok() {
+    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+      eprintln!("SUCCESS: Toggles block {}", block_name);
+    }
+  } else {
+    eprintln!("ERROR: Cannot run `ctk toggle`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
+  }
+}
+
+fn open_cold_turkey(cold_turkey: &mut process::Command) {
+  if cold_turkey.spawn().is_ok() {
+    eprintln!("SUCCESS: Launches Cold Turkey!");
+  } else {
+    eprintln!(
+      r"ERROR: Looks like you don't have Cold Turkey installed on C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe"
+    );
+    eprintln!(
+      "If you do have it installed, please put Cold Turkey Blocker.exe in the folder mentioned."
+    );
+    eprintln!("If not, you're welcome to download it at getcoldturkey.com.");
   }
 }
