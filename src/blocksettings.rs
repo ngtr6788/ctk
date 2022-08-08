@@ -176,6 +176,8 @@ impl Default for BlockSettings {
   }
 }
 
+// Note for the following three functions: serializing requires that the types are passed by reference
+
 fn bool_str_serialize<S: Serializer>(my_bool: &bool, serializer: S) -> Result<S::Ok, S::Error> {
   let bool_str = my_bool.to_string();
   serializer.serialize_str(&bool_str)

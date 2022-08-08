@@ -84,6 +84,8 @@ enum Command {
   },
   /// Interactively suggest what blocks you want Cold Turkey to have
   Suggest,
+  /// List all the blocks in alphabetical order
+  List,
 }
 
 fn main() {
@@ -139,6 +141,7 @@ fn main() {
       Command::Suggest => {
         suggestdialog::suggest();
       }
+      Command::List => list_all_blocks(ct_settings),
     },
     None => open_cold_turkey(&mut cold_turkey),
   }
@@ -360,5 +363,17 @@ fn open_cold_turkey(cold_turkey: &mut process::Command) {
       "If you do have it installed, please put Cold Turkey Blocker.exe in the folder mentioned."
     );
     eprintln!("If not, you're welcome to download it at getcoldturkey.com.");
+  }
+}
+
+fn list_all_blocks(ct_settings: Option<ColdTurkeySettings>) {
+  if let Some(settings) = ct_settings {
+    let mut sorted_keys: Vec<String> = settings.block_list_info.blocks.into_keys().collect();
+    sorted_keys.sort_unstable();
+    for keys in sorted_keys {
+      eprintln!("{keys}");
+    }
+  } else {
+    eprintln!("ERROR: ctk cannot determine all the blocks right now");
   }
 }
