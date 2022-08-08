@@ -182,11 +182,11 @@ pub fn suggest() {
       .allow_empty(true)
       .loop_interact();
 
-    let final_file: String = if !file_name.is_empty() {
-      format!("{}.ctbbl", file_name)
-    } else {
+    let final_file: String = if file_name.is_empty() {
       let num: u64 = rand::thread_rng().gen();
       format!("ctk_{}.ctbbl", num)
+    } else {
+      format!("{}.ctbbl", file_name)
     };
 
     let path = Path::new(&final_file);
@@ -195,7 +195,7 @@ pub fn suggest() {
     match File::create(&path) {
       Ok(file) => match serde_json::to_writer_pretty(file, &list_of_blocks) {
         Ok(_) => {
-          println!("Successfully saved to {} in current directory", display)
+          println!("Successfully saved to {} in current directory", display);
         }
         Err(why) => println!("Could not write to {}: {}", display, why),
       },
@@ -270,13 +270,10 @@ fn read_time_from_stdin<S: Into<String>>(prompt: S) -> NaiveTime {
   input.with_prompt(prompt);
   loop {
     let time_string: String = input.loop_interact();
-    match convert::str_to_time(&time_string) {
-      Ok(time) => break time,
-      Err(_) => {
-        eprintln!("Error in parsing the given time. Please try again.");
-        continue;
-      }
+    if let Ok(time) = convert::str_to_time(&time_string) {
+      break time;
     }
+    eprintln!("Error in parsing the given time. Please try again.");
   }
 }
 
@@ -567,10 +564,8 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
           if start_time.minute() % 5 == 0 {
             break;
-          } else {
-            eprintln!("The minute time must be in multiples of 5");
-            continue;
           }
+          eprintln!("The minute time must be in multiples of 5");
         }
 
         loop {
@@ -578,17 +573,14 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
 
           if end_time.minute() % 5 == 0 {
             break;
-          } else {
-            eprintln!("The minute time must be in multiples of 5");
-            continue;
           }
+          eprintln!("The minute time must be in multiples of 5");
         }
 
         if end_time == midnight || start_time < end_time {
           break;
-        } else {
-          eprintln!("End time must either be after the start time, or end time is midnight");
         }
+        eprintln!("End time must either be after the start time, or end time is midnight");
       }
 
       let break_type = break_method_from_stdin();

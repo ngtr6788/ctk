@@ -117,7 +117,7 @@ fn main() {
         block_name
       );
     }
-    eprintln!("{}", success_message)
+    eprintln!("{}", success_message);
   };
 
   let args = ColdTurkey::parse();
@@ -305,16 +305,15 @@ fn main() {
       }
     },
     None => {
-      match cold_turkey.spawn() {
-        Ok(_) => eprintln!("SUCCESS: Launches Cold Turkey!"),
-        Err(_) => {
-          eprintln!(
-            r"ERROR: Looks like you don't have Cold Turkey installed on C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe"
-          );
-          eprintln!("If you do have it installed, please put Cold Turkey Blocker.exe in the folder mentioned.");
-          eprintln!("If not, you're welcome to download it at getcoldturkey.com.");
-        }
-      };
+      if cold_turkey.spawn().is_ok() {
+        eprintln!("SUCCESS: Launches Cold Turkey!");
+      } else {
+        eprintln!(
+          r"ERROR: Looks like you don't have Cold Turkey installed on C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe"
+        );
+        eprintln!("If you do have it installed, please put Cold Turkey Blocker.exe in the folder mentioned.");
+        eprintln!("If not, you're welcome to download it at getcoldturkey.com.");
+      }
     }
   }
 }

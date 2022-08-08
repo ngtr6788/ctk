@@ -35,12 +35,12 @@ pub enum BreakMethod {
 impl Serialize for BreakMethod {
   fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
     match self {
-      BreakMethod::None => serializer.serialize_str("none"),
-      BreakMethod::Allowance(allow) => {
+      Self::None => serializer.serialize_str("none"),
+      Self::Allowance(allow) => {
         let allow_str = allow.to_string();
         serializer.serialize_str(&allow_str)
       }
-      BreakMethod::Pomodoro(block_min, break_min) => {
+      Self::Pomodoro(block_min, break_min) => {
         let pomodoro_str = format!("{},{}", block_min, break_min);
         serializer.serialize_str(&pomodoro_str)
       }
@@ -59,48 +59,13 @@ pub struct ScheduleBlock {
   pub break_type: BreakMethod,
 }
 
-// #[derive(Debug)]
-// pub struct ScheduleTime {
-//   pub day_of_week: Day,
-//   pub time: NaiveTime,
-// }
-
-// #[derive(Debug, Copy, Clone)]
-// pub enum Day {
-//   Sun,
-//   Mon,
-//   Tue,
-//   Wed,
-//   Thu,
-//   Fri,
-//   Sat,
-// }
-
-// impl Serialize for ScheduleTime {
-//   fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-//     let day_int: u8 = match &self.day_of_week {
-//       Day::Sun => 0,
-//       Day::Mon => 1,
-//       Day::Tue => 2,
-//       Day::Wed => 3,
-//       Day::Thu => 4,
-//       Day::Fri => 5,
-//       Day::Sat => 6,
-//     };
-
-//     let schedule_time_str = format!("{},{},{}", day_int, self.time.hour(), self.time.minute());
-
-//     serializer.serialize_str(&schedule_time_str)
-//   }
-// }
-
 #[derive(Debug)]
 pub struct ScheduleTimeTuple(usize, u32, u32);
 
 impl ScheduleTimeTuple {
   // It's a tuple, why bother with new? It's for better communication.
-  pub fn new(day_of_week: usize, hour: u32, minute: u32) -> Self {
-    ScheduleTimeTuple(day_of_week, hour, minute)
+  pub const fn new(day_of_week: usize, hour: u32, minute: u32) -> Self {
+    Self(day_of_week, hour, minute)
   }
 }
 
@@ -182,7 +147,7 @@ impl Serialize for AppString {
 
 impl BlockSettings {
   pub fn new() -> Self {
-    let new_settings: BlockSettings = BlockSettings {
+    Self {
       sched_type: SchedType::Continuous,
       lock: LockMethod::None,
       lock_unblock: true,
@@ -201,8 +166,7 @@ impl BlockSettings {
       apps: Vec::new(),
       schedule: Vec::new(),
       custom_users: Vec::new(),
-    };
-    new_settings
+    }
   }
 }
 

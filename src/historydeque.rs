@@ -7,7 +7,7 @@ pub struct HistoryDeque<T> {
 
 impl<T> HistoryDeque<T> {
   pub fn new() -> Self {
-    HistoryDeque {
+    Self {
       deque: VecDeque::<T>::new(),
     }
   }
