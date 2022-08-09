@@ -137,9 +137,7 @@ fn main() {
 fn check_if_block_exists(block_name: &str) -> Option<bool> {
   let ct_settings = get_ct_settings();
   if let Some(settings) = &ct_settings {
-    if settings.block_list_info.blocks.contains_key(block_name) {
-      Some(true)
-    } else if block_name == FROZEN_TURKEY {
+    if block_name == FROZEN_TURKEY || settings.block_list_info.blocks.contains_key(block_name) {
       Some(true)
     } else {
       eprintln!(

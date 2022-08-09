@@ -116,6 +116,7 @@ You are now done with one block! If you want to add additional blocks, you are w
 
 ## Wishlist
 - [ ] Make this work on MacOS, since I don't have a MacOS device
+- [x] Get real-time information on Cold Turkey blocks and settings
 - [x] Extend this README.md by writing a walk-through for `ctk suggest` (partially done)
 - [x] ~~Improve on taking in datetime input~~
 - [ ] Work on handling Ctrl + C (Keyboard Interrupts)
