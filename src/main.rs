@@ -359,8 +359,7 @@ fn list_all_blocks(active: Option<bool>) {
     let keys = settings.block_list_info.blocks.keys();
     let mut sorted_keys = Vec::new();
     for key in keys {
-      let block_info = &settings.block_list_info.blocks[key];
-      let block_inactive = block_info.block_list.is_empty() && block_info.exception_list.is_empty() && block_info.title_list.is_empty();
+      let block_inactive = settings.block_list_info.blocks[key].is_dormant();
 
       if let Some(a) = active {
         if (a && block_inactive) || (!a && !block_inactive) {
