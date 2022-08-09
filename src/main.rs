@@ -94,6 +94,8 @@ enum Command {
 
 const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
 
+const FROZEN_TURKEY: &str = "Frozen Turkey";
+
 fn main() {
   let args = ColdTurkey::parse();
   match &args.command {
@@ -137,6 +139,8 @@ fn check_if_block_exists(block_name: &str) -> Option<bool> {
   if let Some(settings) = &ct_settings {
     if settings.block_list_info.blocks.contains_key(block_name) {
       Some(true)
+    } else if block_name == FROZEN_TURKEY {
+      Some(true)
     } else {
       eprintln!(
         "ERROR: Block {} cannot be found in your Cold Turkey application",
@@ -164,6 +168,11 @@ fn start_block_with_password(block_name: &str) {
     }
   } else {
     eprintln!("WARNING: Cannot check if user is a pro user or not right now.");
+  }
+
+  if block_name == FROZEN_TURKEY {
+    eprintln!("ERROR: You can only start Frozen Turkey when time is provided. Consider `ctk start for` or `ctk start until`.");
+    return;
   }
 
   let p = Zeroizing::new(loop {
@@ -259,6 +268,11 @@ fn start_block_until_time(block_name: &str, endtime: NaiveTime, enddate: Option<
 }
 
 fn start_block_unlocked(block_name: &str) {
+  if block_name == FROZEN_TURKEY {
+    eprintln!("ERROR: You can only start Frozen Turkey when time is provided. Consider `ctk start for` or `ctk start until`.");
+    return;
+  }
+
   if process::Command::new(CT_EXEC)
     .args(["-start", block_name])
     .spawn()
@@ -287,6 +301,11 @@ fn stop_block(block_name: &str) {
 }
 
 fn add_websites_to_block(block_name: &str, url: &str, except: bool) {
+  if block_name == FROZEN_TURKEY {
+    eprintln!("ERROR: You cannot add websites to the Frozen Turkey block.");
+    return;
+  }
+
   let except_cmd: &str = if except { "-exception" } else { "-web" };
   if process::Command::new(CT_EXEC)
     .args(["-add", block_name, except_cmd, url])
@@ -302,6 +321,11 @@ fn add_websites_to_block(block_name: &str, url: &str, except: bool) {
 }
 
 fn toggle_block(block_name: &str) {
+  if block_name == FROZEN_TURKEY {
+    eprintln!("ERROR: You can only start Frozen Turkey when time is provided. Consider `ctk start for` or `ctk start until`.");
+    return;
+  }
+
   if process::Command::new(CT_EXEC)
     .args(["-toggle", block_name])
     .spawn()
@@ -345,10 +369,11 @@ fn list_all_blocks(active: Option<bool>) {
       }
       sorted_keys.push(key);
     }
+    
     sorted_keys.sort_unstable();
     for key in sorted_keys {
       eprintln!("{key}");
-   }
+    }
   } else {
     eprintln!("ERROR: ctk cannot determine all the blocks right now");
   }
