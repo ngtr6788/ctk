@@ -84,8 +84,12 @@ enum Command {
   },
   /// Interactively suggest what blocks you want Cold Turkey to have
   Suggest,
-  /// List all the blocks in alphabetical order
-  List,
+  /// List all the blocks in alphabetical order by default
+  List {
+    #[clap(short, long)]
+    /// Only display active or inactive blocks only 
+    active: Option<bool>
+  },
 }
 
 const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
@@ -122,7 +126,7 @@ fn main() {
       Command::Suggest => {
         suggestdialog::suggest();
       }
-      Command::List => list_all_blocks(),
+      Command::List { active } => list_all_blocks(*active),
     },
     None => open_cold_turkey(),
   }
@@ -325,14 +329,26 @@ fn open_cold_turkey() {
   }
 }
 
-fn list_all_blocks() {
+fn list_all_blocks(active: Option<bool>) {
   let ct_settings = get_ct_settings();
   if let Some(settings) = ct_settings {
-    let mut sorted_keys: Vec<String> = settings.block_list_info.blocks.into_keys().collect();
-    sorted_keys.sort_unstable();
-    for keys in sorted_keys {
-      eprintln!("{keys}");
+    let keys = settings.block_list_info.blocks.keys();
+    let mut sorted_keys = Vec::new();
+    for key in keys {
+      let block_info = &settings.block_list_info.blocks[key];
+      let block_inactive = block_info.block_list.is_empty() && block_info.exception_list.is_empty() && block_info.title_list.is_empty();
+
+      if let Some(a) = active {
+        if (a && block_inactive) || (!a && !block_inactive) {
+          continue;
+        }
+      }
+      sorted_keys.push(key);
     }
+    sorted_keys.sort_unstable();
+    for key in sorted_keys {
+      eprintln!("{key}");
+   }
   } else {
     eprintln!("ERROR: ctk cannot determine all the blocks right now");
   }
