@@ -24,7 +24,7 @@ pub struct ColdTurkeySettings {
   pub block_inactive: bool,
   #[serde(deserialize_with = "deserialize_string_to_bool")]
   pub force_allow_file: bool,
-  pub is_pro: String,
+  pub is_pro: UserStatus,
   #[serde(deserialize_with = "deserialize_string_to_bool")]
   pub ignore_incognito: bool,
 }
@@ -55,17 +55,25 @@ pub struct BlockInfo {
   pub title_list: Vec<String>,
 }
 
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UserStatus {
+  Free,
+  Trial,
+  Pro,
+}
+
 impl BlockInfo {
   pub fn is_dormant(&self) -> bool {
     self.allowance == None
-    && self.allowance_remaining == None
-    && self.pomodoro_period_remaining == None
-    && self.pomodoro_period_state.is_empty()
-    && self.password.is_empty()
-    && self.random_text_length == None
-    && self.block_list.is_empty()
-    && self.exception_list.is_empty()
-    && self.title_list.is_empty()
+      && self.allowance_remaining == None
+      && self.pomodoro_period_remaining == None
+      && self.pomodoro_period_state.is_empty()
+      && self.password.is_empty()
+      && self.random_text_length == None
+      && self.block_list.is_empty()
+      && self.exception_list.is_empty()
+      && self.title_list.is_empty()
   }
 }
 
@@ -95,9 +103,9 @@ where
   }
 }
 
-fn deserialize_string_to_option_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error> 
+fn deserialize_string_to_option_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
 where
-    D: Deserializer<'de>
+  D: Deserializer<'de>,
 {
   let s: &str = Deserialize::deserialize(deserializer)?;
   if s.is_empty() {

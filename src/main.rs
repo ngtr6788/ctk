@@ -2,7 +2,7 @@
 #![allow(unused_must_use)]
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{ColorChoice, Parser, Subcommand};
-use ctsettings::ColdTurkeySettings;
+use ctsettings::{ColdTurkeySettings, UserStatus};
 use dialoguer::Password;
 use std::process;
 use zeroize::Zeroizing;
@@ -87,8 +87,8 @@ enum Command {
   /// List all the blocks in alphabetical order by default
   List {
     #[clap(short, long)]
-    /// Only display active or inactive blocks only 
-    active: Option<bool>
+    /// Only display active or inactive blocks only
+    active: Option<bool>,
   },
 }
 
@@ -160,7 +160,7 @@ fn check_if_block_exists(block_name: &str) -> Option<bool> {
 fn start_block_with_password(block_name: &str) {
   let ct_settings = get_ct_settings();
   if let Some(settings) = &ct_settings {
-    if settings.is_pro == "free" {
+    if settings.is_pro == UserStatus::Free {
       eprintln!(
         "ERROR: Cannot start a block with a password as a free user. Consider upgrading to pro."
       );
@@ -356,6 +356,7 @@ fn open_cold_turkey() {
 fn list_all_blocks(active: Option<bool>) {
   let ct_settings = get_ct_settings();
   if let Some(settings) = ct_settings {
+    dbg!(&settings);
     let keys = settings.block_list_info.blocks.keys();
     let mut sorted_keys = Vec::new();
     for key in keys {
@@ -368,7 +369,7 @@ fn list_all_blocks(active: Option<bool>) {
       }
       sorted_keys.push(key);
     }
-    
+
     sorted_keys.sort_unstable();
     for key in sorted_keys {
       eprintln!("{key}");
