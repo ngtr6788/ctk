@@ -362,7 +362,6 @@ fn open_cold_turkey() {
 fn list_all_blocks(active: Option<bool>) {
   let ct_settings = get_ct_settings();
   if let Some(settings) = ct_settings {
-    dbg!(&settings);
     let keys = settings.block_list_info.blocks.keys();
     let mut sorted_keys = Vec::new();
     for key in keys {
