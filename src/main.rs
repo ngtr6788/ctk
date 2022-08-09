@@ -88,22 +88,9 @@ enum Command {
   List,
 }
 
+const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
+
 fn main() {
-  let mut cold_turkey =
-    process::Command::new(r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe");
-
-  let ct_settings: Option<ColdTurkeySettings> =
-    match process::Command::new(r"C:\Program Files\Cold Turkey\CTMsgHostEdge.exe").output() {
-      Ok(block_stdout) => {
-        let output_vector = block_stdout.stdout;
-        match std::str::from_utf8(&output_vector[4..]) {
-          Ok(ct_string) => serde_json::from_str(ct_string).ok(),
-          Err(_) => None,
-        }
-      }
-      Err(_) => None,
-    };
-
   let args = ColdTurkey::parse();
   match &args.command {
     Some(cmd) => match &cmd {
@@ -112,45 +99,37 @@ fn main() {
         password,
         subcommand,
       } => match password {
-        true => start_block_with_password(block_name, &mut cold_turkey, &ct_settings),
+        true => start_block_with_password(block_name),
         false => match subcommand {
           Some(method) => match method {
             ForSubcommands::For { minutes } => {
-              start_block_for_some_minutes(block_name, *minutes, &mut cold_turkey, &ct_settings);
+              start_block_for_some_minutes(block_name, *minutes);
             }
             ForSubcommands::Until { endtime, enddate } => {
-              start_block_until_time(
-                block_name,
-                *endtime,
-                *enddate,
-                &mut cold_turkey,
-                &ct_settings,
-              );
+              start_block_until_time(block_name, *endtime, *enddate);
             }
           },
-          None => start_block_unlocked(block_name, &mut cold_turkey, &ct_settings),
+          None => start_block_unlocked(block_name),
         },
       },
-      Command::Stop { block_name } => stop_block(block_name, &mut cold_turkey, &ct_settings),
+      Command::Stop { block_name } => stop_block(block_name),
       Command::Add {
         block_name,
         url,
         except,
-      } => add_websites_to_block(block_name, url, *except, &mut cold_turkey, &ct_settings),
-      Command::Toggle { block_name } => toggle_block(block_name, &mut cold_turkey, &ct_settings),
+      } => add_websites_to_block(block_name, url, *except),
+      Command::Toggle { block_name } => toggle_block(block_name),
       Command::Suggest => {
         suggestdialog::suggest();
       }
-      Command::List => list_all_blocks(ct_settings),
+      Command::List => list_all_blocks(),
     },
-    None => open_cold_turkey(&mut cold_turkey),
+    None => open_cold_turkey(),
   }
 }
 
-fn check_if_block_exists(
-  block_name: &str,
-  ct_settings: &Option<ColdTurkeySettings>,
-) -> Option<bool> {
+fn check_if_block_exists(block_name: &str) -> Option<bool> {
+  let ct_settings = get_ct_settings();
   if let Some(settings) = &ct_settings {
     if settings.block_list_info.blocks.contains_key(block_name) {
       Some(true)
@@ -170,11 +149,8 @@ fn check_if_block_exists(
   }
 }
 
-fn start_block_with_password(
-  block_name: &str,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
+fn start_block_with_password(block_name: &str) {
+  let ct_settings = get_ct_settings();
   if let Some(settings) = &ct_settings {
     if settings.is_pro == "free" {
       eprintln!(
@@ -193,12 +169,12 @@ fn start_block_with_password(
     }
   });
 
-  if cold_turkey
+  if process::Command::new(CT_EXEC)
     .args(["-start", block_name, "-password", &p])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!("SUCCESS: Starts blocking {} with a password", block_name);
     }
   } else {
@@ -206,18 +182,13 @@ fn start_block_with_password(
   }
 }
 
-fn start_block_for_some_minutes(
-  block_name: &str,
-  minutes: u32,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
-  if cold_turkey
+fn start_block_for_some_minutes(block_name: &str, minutes: u32) {
+  if process::Command::new(CT_EXEC)
     .args(["-start", block_name, "-lock", &minutes.to_string()])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!(
         "SUCCESS: Starts blocking {} locked for {} minutes",
         block_name, minutes
@@ -228,13 +199,7 @@ fn start_block_for_some_minutes(
   }
 }
 
-fn start_block_until_time(
-  block_name: &str,
-  endtime: NaiveTime,
-  enddate: Option<NaiveDate>,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
+fn start_block_until_time(block_name: &str, endtime: NaiveTime, enddate: Option<NaiveDate>) {
   let datetime: DateTime<Local> = match enddate {
     Some(date) => {
       let naive_datetime: NaiveDateTime = date.and_time(endtime);
@@ -272,12 +237,12 @@ fn start_block_until_time(
   } else {
     duration.num_minutes() + 1
   };
-  if cold_turkey
+  if process::Command::new(CT_EXEC)
     .args(["-start", block_name, "-lock", &duration_minutes.to_string()])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!(
         "SUCCESS: Starts blocking {} locked until {}",
         block_name,
@@ -289,13 +254,13 @@ fn start_block_until_time(
   }
 }
 
-fn start_block_unlocked(
-  block_name: &str,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
-  if cold_turkey.args(["-start", block_name]).spawn().is_ok() {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+fn start_block_unlocked(block_name: &str) {
+  if process::Command::new(CT_EXEC)
+    .args(["-start", block_name])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!("SUCCESS: Starts blocking {}", block_name);
     }
   } else {
@@ -303,13 +268,13 @@ fn start_block_unlocked(
   }
 }
 
-fn stop_block(
-  block_name: &str,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
-  if cold_turkey.args(["-stop", block_name]).spawn().is_ok() {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+fn stop_block(block_name: &str) {
+  if process::Command::new(CT_EXEC)
+    .args(["-stop", block_name])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!("SUCCESS: Stops blocking {}", block_name);
     }
   } else {
@@ -317,20 +282,14 @@ fn stop_block(
   }
 }
 
-fn add_websites_to_block(
-  block_name: &str,
-  url: &str,
-  except: bool,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
+fn add_websites_to_block(block_name: &str, url: &str, except: bool) {
   let except_cmd: &str = if except { "-exception" } else { "-web" };
-  if cold_turkey
+  if process::Command::new(CT_EXEC)
     .args(["-add", block_name, except_cmd, url])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!("SUCCESS: Adds url {} to block {}", url, block_name);
     }
   } else {
@@ -338,13 +297,13 @@ fn add_websites_to_block(
   }
 }
 
-fn toggle_block(
-  block_name: &str,
-  cold_turkey: &mut process::Command,
-  ct_settings: &Option<ColdTurkeySettings>,
-) {
-  if cold_turkey.args(["-toggle", block_name]).spawn().is_ok() {
-    if Some(false) != check_if_block_exists(block_name, ct_settings) {
+fn toggle_block(block_name: &str) {
+  if process::Command::new(CT_EXEC)
+    .args(["-toggle", block_name])
+    .spawn()
+    .is_ok()
+  {
+    if Some(false) != check_if_block_exists(block_name) {
       eprintln!("SUCCESS: Toggles block {}", block_name);
     }
   } else {
@@ -352,8 +311,8 @@ fn toggle_block(
   }
 }
 
-fn open_cold_turkey(cold_turkey: &mut process::Command) {
-  if cold_turkey.spawn().is_ok() {
+fn open_cold_turkey() {
+  if process::Command::new(CT_EXEC).spawn().is_ok() {
     eprintln!("SUCCESS: Launches Cold Turkey!");
   } else {
     eprintln!(
@@ -366,7 +325,8 @@ fn open_cold_turkey(cold_turkey: &mut process::Command) {
   }
 }
 
-fn list_all_blocks(ct_settings: Option<ColdTurkeySettings>) {
+fn list_all_blocks() {
+  let ct_settings = get_ct_settings();
   if let Some(settings) = ct_settings {
     let mut sorted_keys: Vec<String> = settings.block_list_info.blocks.into_keys().collect();
     sorted_keys.sort_unstable();
@@ -375,5 +335,18 @@ fn list_all_blocks(ct_settings: Option<ColdTurkeySettings>) {
     }
   } else {
     eprintln!("ERROR: ctk cannot determine all the blocks right now");
+  }
+}
+
+fn get_ct_settings() -> Option<ColdTurkeySettings> {
+  match process::Command::new(r"C:\Program Files\Cold Turkey\CTMsgHostEdge.exe").output() {
+    Ok(block_stdout) => {
+      let output_vector = block_stdout.stdout;
+      match std::str::from_utf8(&output_vector[4..]) {
+        Ok(ct_string) => serde_json::from_str(ct_string).ok(),
+        Err(_) => None,
+      }
+    }
+    Err(_) => None,
   }
 }
