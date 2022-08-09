@@ -267,15 +267,39 @@ fn break_method_from_stdin() -> BreakMethod {
 }
 
 fn read_time_from_stdin<S: Into<String>>(prompt: S) -> NaiveTime {
-  let mut input: Input<String> = Input::new();
-  input.with_prompt(prompt);
-  loop {
-    let time_string: String = input.loop_interact();
-    if let Ok(time) = convert::str_to_time(&time_string) {
-      break time;
-    }
-    eprintln!("Error in parsing the given time. Please try again.");
-  }
+  let time_string = Input::new()
+    .with_prompt(prompt)
+    .validate_with(|time_string: &String| {
+      convert::str_to_time(&time_string)
+        .map(|_| ())
+        .map_err(|_| "Invalid time format for string")
+    })
+    .loop_interact();
+
+  // We can safely unwrap because convert::str_to_time is already checked to be ok
+  // in the validator closure. If it is not ok, it keeps looping until it's ok.
+  convert::str_to_time(&time_string).unwrap()
+}
+
+fn read_time_with_divisible_by_5_check<S: Into<String>>(prompt: S) -> NaiveTime {
+  let time_string = Input::new()
+    .with_prompt(prompt)
+    .validate_with(|time_string: &String| {
+      if let Ok(time) = convert::str_to_time(&time_string) {
+        if time.minute() % 5 == 0 {
+          Ok(())
+        } else {
+          Err("The minute time must be in multiples of 5")
+        }
+      } else {
+        Err("Invalid time format for string")
+      }
+    })
+    .loop_interact();
+
+  // We can safely unwrap because convert::str_to_time is already checked to be ok
+  // in the validator closure. If it is not ok, it keeps looping until it's ok.
+  convert::str_to_time(&time_string).unwrap()
 }
 
 fn block_settings_from_stdin() -> Option<BlockSettings> {
@@ -580,23 +604,9 @@ fn read_schedule_from_stdin() -> Vec<ScheduleBlock> {
     let midnight: NaiveTime = NaiveTime::from_hms(0, 0, 0);
 
     loop {
-      loop {
-        start_time = read_time_from_stdin("Enter start time");
+      start_time = read_time_with_divisible_by_5_check("Enter start time");
 
-        if start_time.minute() % 5 == 0 {
-          break;
-        }
-        eprintln!("The minute time must be in multiples of 5");
-      }
-
-      loop {
-        end_time = read_time_from_stdin("Enter end time");
-
-        if end_time.minute() % 5 == 0 {
-          break;
-        }
-        eprintln!("The minute time must be in multiples of 5");
-      }
+      end_time = read_time_with_divisible_by_5_check("Enter end time");
 
       if end_time == midnight || start_time < end_time {
         break;
