@@ -135,9 +135,13 @@ fn main() {
 }
 
 fn check_if_block_exists(block_name: &str) -> Option<bool> {
+  if block_name == FROZEN_TURKEY {
+    return Some(true);
+  }
+
   let ct_settings = get_ct_settings();
   if let Some(settings) = &ct_settings {
-    if block_name == FROZEN_TURKEY || settings.block_list_info.blocks.contains_key(block_name) {
+    if settings.block_list_info.blocks.contains_key(block_name) {
       Some(true)
     } else {
       eprintln!(
@@ -156,6 +160,11 @@ fn check_if_block_exists(block_name: &str) -> Option<bool> {
 }
 
 fn start_block_with_password(block_name: &str) {
+  if block_name == FROZEN_TURKEY {
+    eprintln!("ERROR: You can only start Frozen Turkey when time is provided. Consider `ctk start for` or `ctk start until`.");
+    return;
+  }
+
   let ct_settings = get_ct_settings();
   if let Some(settings) = &ct_settings {
     if settings.is_pro == UserStatus::Free {
@@ -164,13 +173,19 @@ fn start_block_with_password(block_name: &str) {
       );
       return;
     }
-  } else {
-    eprintln!("WARNING: Cannot check if user is a pro user or not right now.");
-  }
 
-  if block_name == FROZEN_TURKEY {
-    eprintln!("ERROR: You can only start Frozen Turkey when time is provided. Consider `ctk start for` or `ctk start until`.");
-    return;
+    if !settings.block_list_info.blocks.contains_key(block_name) {
+      eprintln!(
+        "ERROR: Block {} cannot be found in your Cold Turkey application",
+        block_name
+      );
+      return;
+    }
+  } else {
+    eprintln!(
+      "WARNING: ctk cannot check if block {} is in your Cold Turkey application right now",
+      block_name
+    );
   }
 
   let p = Zeroizing::new(loop {
@@ -185,32 +200,36 @@ fn start_block_with_password(block_name: &str) {
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      eprintln!("SUCCESS: Starts blocking {} with a password", block_name);
-    }
+    eprintln!("SUCCESS: Starts blocking {} with a password", block_name);
   } else {
     eprintln!("ERROR: Cannot run `ctk start --password`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
   }
 }
 
 fn start_block_for_some_minutes(block_name: &str, minutes: u32) {
+  if Some(false) == check_if_block_exists(block_name) {
+    return;
+  }
+
   if process::Command::new(CT_EXEC)
     .args(["-start", block_name, "-lock", &minutes.to_string()])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      eprintln!(
-        "SUCCESS: Starts blocking {} locked for {} minutes",
-        block_name, minutes
-      );
-    }
+    eprintln!(
+      "SUCCESS: Starts blocking {} locked for {} minutes",
+      block_name, minutes
+    );
   } else {
     eprintln!("ERROR: Cannot run `ctk start for`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
   }
 }
 
 fn start_block_until_time(block_name: &str, endtime: NaiveTime, enddate: Option<NaiveDate>) {
+  if Some(false) == check_if_block_exists(block_name) {
+    return;
+  }
+
   let datetime: DateTime<Local> = match enddate {
     Some(date) => {
       let naive_datetime: NaiveDateTime = date.and_time(endtime);
@@ -261,13 +280,11 @@ fn start_block_until_time(block_name: &str, endtime: NaiveTime, enddate: Option<
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      eprintln!(
-        "SUCCESS: Starts blocking {} locked until {}",
-        block_name,
-        datetime.format("%H:%M %B %d %Y")
-      );
-    }
+    eprintln!(
+      "SUCCESS: Starts blocking {} locked until {}",
+      block_name,
+      datetime.format("%H:%M %B %d %Y")
+    );
   } else {
     eprintln!("ERROR: Cannot run `ctk start until`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
   }
@@ -279,33 +296,42 @@ fn start_block_unlocked(block_name: &str) {
     return;
   }
 
+  if Some(false) == check_if_block_exists(block_name) {
+    return;
+  }
+
   if process::Command::new(CT_EXEC)
     .args(["-start", block_name])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      eprintln!("SUCCESS: Starts blocking {}", block_name);
-    }
+    eprintln!("SUCCESS: Starts blocking {}", block_name);
   } else {
     eprintln!("ERROR: Cannot run `ctk start`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
   }
 }
 
 fn stop_block(block_name: &str) {
+  if FROZEN_TURKEY == block_name {
+    eprintln!("FAILURE: Cannot stop Frozen Turkey because it is a timed, locked block. If it is already off, no need to worry.");
+    return;
+  }
+
+  if Some(false) == check_if_block_exists(block_name) {
+    return;
+  }
+
   if process::Command::new(CT_EXEC)
     .args(["-stop", block_name])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      // Why unwrap? It's safe to assume that if the first get_ct_settings works, why not the second?
-      let new_ct_settings = get_ct_settings().unwrap();
-      if new_ct_settings.block_list_info.blocks[block_name].is_dormant() {
-        eprintln!("SUCCESS: Stops blocking {}", block_name);
-      } else {
-        eprintln!("FAILURE: Failed to stop blocking {block_name}");
-      }
+    // Why unwrap? It's safe to assume that if the first get_ct_settings works, why not the second?
+    let new_ct_settings = get_ct_settings().unwrap();
+    if new_ct_settings.block_list_info.blocks[block_name].is_dormant() {
+      eprintln!("SUCCESS: Stops blocking {}", block_name);
+    } else {
+      eprintln!("FAILURE: Failed to stop blocking {block_name}");
     }
   } else {
     eprintln!("ERROR: Cannot run `ctk stop`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
@@ -318,15 +344,17 @@ fn add_websites_to_block(block_name: &str, url: &str, except: bool) {
     return;
   }
 
+  if Some(false) == check_if_block_exists(block_name) {
+    return;
+  }
+
   let except_cmd: &str = if except { "-exception" } else { "-web" };
   if process::Command::new(CT_EXEC)
     .args(["-add", block_name, except_cmd, url])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      eprintln!("SUCCESS: Adds url {} to block {}", url, block_name);
-    }
+    eprintln!("SUCCESS: Adds url {} to block {}", url, block_name);
   } else {
     eprintln!("ERROR: Cannot run `ctk add`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
   }
