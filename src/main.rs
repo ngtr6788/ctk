@@ -299,7 +299,13 @@ fn stop_block(block_name: &str) {
     .is_ok()
   {
     if Some(false) != check_if_block_exists(block_name) {
-      eprintln!("SUCCESS: Stops blocking {}", block_name);
+      // Why unwrap? It's safe to assume that if the first get_ct_settings works, why not the second?
+      let new_ct_settings = get_ct_settings().unwrap();
+      if new_ct_settings.block_list_info.blocks[block_name].is_dormant() {
+        eprintln!("SUCCESS: Stops blocking {}", block_name);
+      } else {
+        eprintln!("FAILURE: Failed to stop blocking {block_name}");
+      }
     }
   } else {
     eprintln!("ERROR: Cannot run `ctk stop`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
@@ -332,13 +338,39 @@ fn toggle_block(block_name: &str) {
     return;
   }
 
+  let ct_settings = get_ct_settings();
+  let is_off_old = if let Some(settings) = &ct_settings {
+    if settings.block_list_info.blocks.contains_key(block_name) {
+      settings.block_list_info.blocks[block_name].is_dormant()
+    } else {
+      eprintln!(
+        "ERROR: Block {} cannot be found in your Cold Turkey application",
+        block_name
+      );
+      return;
+    }
+  } else {
+    eprintln!(
+      "WARNING: ctk cannot check if block {} is in your Cold Turkey application right now",
+      block_name
+    );
+    return;
+  };
+
   if process::Command::new(CT_EXEC)
     .args(["-toggle", block_name])
     .spawn()
     .is_ok()
   {
-    if Some(false) != check_if_block_exists(block_name) {
-      eprintln!("SUCCESS: Toggles block {}", block_name);
+    // Why unwrap? It's safe to assume that if the first get_ct_settings works, why not the second?
+    let new_settings = get_ct_settings().unwrap();
+    let is_off_new = new_settings.block_list_info.blocks[block_name].is_dormant();
+
+    match (is_off_old, is_off_new) {
+      (true, false) => eprintln!("SUCCESS: Starts block {}", block_name),
+      (false, true) => eprintln!("SUCCESS: Stops block {block_name}"),
+      (false, false) => eprintln!("FAILURE: Failed to stop blocking {block_name}"),
+      (true, true) => eprintln!("FAILURE: Failed to start blocking {block_name}"), // rare, probs impossible
     }
   } else {
     eprintln!("ERROR: Cannot run `ctk toggle`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
