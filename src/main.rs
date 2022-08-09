@@ -248,6 +248,14 @@ fn start_block_until_time(block_name: &str, endtime: NaiveTime, enddate: Option<
   } else {
     duration.num_minutes() + 1
   };
+
+  if duration_minutes <= 0 {
+    eprintln!(
+      "ERROR: Cannot start block until a time in the past. Please enter a time in the future."
+    );
+    return;
+  }
+
   if process::Command::new(CT_EXEC)
     .args(["-start", block_name, "-lock", &duration_minutes.to_string()])
     .spawn()
