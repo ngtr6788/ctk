@@ -354,7 +354,19 @@ fn add_websites_to_block(block_name: &str, url: &str, except: bool) {
     .spawn()
     .is_ok()
   {
-    eprintln!("SUCCESS: Adds url {} to block {}", url, block_name);
+    let new_ct_settings = get_ct_settings().unwrap();
+    let block_info = &new_ct_settings.block_list_info.blocks[block_name];
+
+    let is_dormant = block_info.is_dormant();
+
+    let string_url = url.to_string();
+    if except && (is_dormant || block_info.exception_list.contains(&string_url)) {
+      eprintln!("SUCCESS: Adds url {url} to block {block_name} as an exception");
+    } else if !except && (is_dormant || block_info.block_list.contains(&string_url)) {
+      eprintln!("SUCCESS: Adds url {url} to block {block_name}");
+    } else {
+      eprintln!("FAILURE: Cannot add url {url} to block {block_name}");
+    }
   } else {
     eprintln!("ERROR: Cannot run `ctk add`. Did you make sure Cold Turkey is installed and in the right folder? Try typing ctk");
   }
