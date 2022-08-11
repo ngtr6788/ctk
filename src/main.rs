@@ -1,5 +1,3 @@
-// Get rid of unused_must_use errors for now
-#![allow(unused_must_use)]
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{ColorChoice, Parser, Subcommand};
 use ctsettings::{ColdTurkeySettings, UserStatus};

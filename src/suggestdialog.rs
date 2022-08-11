@@ -270,7 +270,7 @@ fn read_time_from_stdin<S: Into<String>>(prompt: S) -> NaiveTime {
   let time_string = Input::new()
     .with_prompt(prompt)
     .validate_with(|time_string: &String| {
-      convert::str_to_time(&time_string)
+      convert::str_to_time(time_string)
         .map(|_| ())
         .map_err(|_| "Invalid time format for string")
     })
@@ -285,7 +285,7 @@ fn read_time_with_divisible_by_5_check<S: Into<String>>(prompt: S) -> NaiveTime 
   let time_string = Input::new()
     .with_prompt(prompt)
     .validate_with(|time_string: &String| {
-      if let Ok(time) = convert::str_to_time(&time_string) {
+      if let Ok(time) = convert::str_to_time(time_string) {
         if time.minute() % 5 == 0 {
           Ok(())
         } else {
@@ -470,11 +470,15 @@ fn add_apps_and_folders_from_filesystem() -> Option<Vec<AppString>> {
         };
 
         if &shlex_parse[0] == "cd" {
-          if shlex_parse.len() == 2 {
+          let change_dir_result = if shlex_parse.len() == 2 {
             let path = PathBuf::from(&shlex_parse[1]);
-            env::set_current_dir(path);
+            env::set_current_dir(path)
           } else {
-            env::set_current_dir(".");
+            env::set_current_dir(".")
+          };
+
+          if let Err(err) = change_dir_result {
+            eprintln!("{err}");
           }
         } else if &shlex_parse[0] == "ls" {
           let apps_list: Vec<String> = list_paths_in_current_directory(&current_dir);
@@ -532,7 +536,9 @@ fn add_apps_and_folders_from_filesystem() -> Option<Vec<AppString>> {
     }
   }
 
-  env::set_current_dir(&original_curdir);
+  if let Err(err) = env::set_current_dir(&original_curdir) {
+    eprintln!("{err}");
+  }
 
   Some(apps)
 }
