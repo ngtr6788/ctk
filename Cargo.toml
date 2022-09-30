@@ -18,3 +18,4 @@ sublime_fuzzy = "0.7.0"
 indicatif = { version = "0.16.2", features = ["rayon"] }
 zeroize = "1.5.7"
 rayon = "1.5.3"
+colour = "0.6.0"

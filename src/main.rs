@@ -1,5 +1,6 @@
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{ColorChoice, Parser, Subcommand};
+use colour::{e_yellow_ln};
 use ctsettings::{ColdTurkeySettings, UserStatus};
 use dialoguer::Password;
 use std::process;
@@ -83,11 +84,7 @@ enum Command {
   /// Interactively suggest what blocks you want Cold Turkey to have
   Suggest,
   /// List all the blocks in alphabetical order by default
-  List {
-    #[clap(short, long)]
-    /// Only display active or inactive blocks only
-    active: Option<bool>,
-  },
+  List,
 }
 
 const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
@@ -126,7 +123,7 @@ fn main() {
       Command::Suggest => {
         suggestdialog::suggest();
       }
-      Command::List { active } => list_all_blocks(*active),
+      Command::List => list_all_blocks(),
     },
     None => open_cold_turkey(),
   }
@@ -429,25 +426,23 @@ fn open_cold_turkey() {
   }
 }
 
-fn list_all_blocks(active: Option<bool>) {
+fn list_all_blocks() {
   let ct_settings = get_ct_settings();
   if let Some(settings) = ct_settings {
     let keys = settings.block_list_info.blocks.keys();
     let mut sorted_keys = Vec::new();
     for key in keys {
       let block_inactive = settings.block_list_info.blocks[key].is_dormant();
-
-      if let Some(a) = active {
-        if (a && block_inactive) || (!a && !block_inactive) {
-          continue;
-        }
-      }
-      sorted_keys.push(key);
+      sorted_keys.push((key, block_inactive));
     }
 
     sorted_keys.sort_unstable();
-    for key in sorted_keys {
-      eprintln!("{key}");
+    for (key, inactive) in sorted_keys {
+      if inactive {
+        println!("{}", key);
+      } else {
+        e_yellow_ln!("* {} *", key);
+      }
     }
   } else {
     eprintln!("ERROR: ctk cannot determine all the blocks right now");
