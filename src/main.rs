@@ -1,6 +1,6 @@
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 use clap::{ColorChoice, Parser, Subcommand};
-use colour::{e_yellow_ln};
+use colour::e_yellow_ln;
 use ctsettings::{ColdTurkeySettings, UserStatus};
 use dialoguer::Password;
 use std::process;
@@ -32,11 +32,16 @@ struct ColdTurkey {
 }
 
 #[derive(Subcommand)]
-enum ForSubcommands {
+enum StartSubcommands {
   /// Set a time period to block
   For {
     /// How long to block in minutes
-    minutes: u32,
+    #[clap(long)]
+    minutes: Option<u32>,
+    #[clap(long)]
+    hours: Option<u32>,
+    #[clap(long)]
+    days: Option<u32>,
   },
   /// Set when the block is finished
   Until {
@@ -59,7 +64,7 @@ enum Command {
     /// Password to lock the block
     password: bool,
     #[clap(subcommand)]
-    subcommand: Option<ForSubcommands>,
+    subcommand: Option<StartSubcommands>,
   },
   /// Stop a block
   Stop {
@@ -103,10 +108,16 @@ fn main() {
         true => start_block_with_password(block_name),
         false => match subcommand {
           Some(method) => match method {
-            ForSubcommands::For { minutes } => {
-              start_block_for_some_minutes(block_name, *minutes);
+            StartSubcommands::For {
+              minutes,
+              hours,
+              days,
+            } => {
+              let total_minutes =
+                days.unwrap_or(0) * 24 * 60 + hours.unwrap_or(0) * 60 + minutes.unwrap_or(0);
+              start_block_for_some_minutes(block_name, total_minutes);
             }
-            ForSubcommands::Until { endtime, enddate } => {
+            StartSubcommands::Until { endtime, enddate } => {
               start_block_until_time(block_name, *endtime, *enddate);
             }
           },
