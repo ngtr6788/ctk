@@ -3,7 +3,9 @@ use clap::{ColorChoice, Parser, Subcommand};
 use colour::e_yellow_ln;
 use ctsettings::{ColdTurkeySettings, UserStatus};
 use dialoguer::Password;
+use std::fs;
 use std::io::Write;
+use std::path::Path;
 use std::{fs::File, process};
 use zeroize::Zeroizing;
 
@@ -92,7 +94,11 @@ enum Command {
   /// List all the blocks in alphabetical order by default
   List,
   /// Installs Cold Turkey
-  Install,
+  Install {
+    /// Force installing Cold Turkey, regardless if Cold Turkey Blocker exists
+    #[clap(short, long)]
+    force: bool
+  },
 }
 
 const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
@@ -138,7 +144,7 @@ fn main() {
         suggestdialog::suggest();
       }
       Command::List => list_all_blocks(),
-      Command::Install => install_cold_turkey(),
+      Command::Install { force } => install_cold_turkey(*force),
     },
     None => open_cold_turkey(),
   }
@@ -477,22 +483,29 @@ fn get_ct_settings() -> Option<ColdTurkeySettings> {
   }
 }
 
-fn install_cold_turkey() {
-  match try_install_cold_turkey() {
-    Ok(_) => eprintln!("SUCCESS: Installation successful"),
-    Err(_) => eprintln!("ERROR: Something went wrong in downloading the Cold Turkey installer."),
+fn install_cold_turkey(force: bool) {
+  if !force && Path::new(CT_EXEC).exists() {
+    eprintln!("Cold Turkey Blocker already exists");
+  } else {
+    match try_install_cold_turkey() {
+      Ok(_) => eprintln!("SUCCESS: Installation successful"),
+      Err(_) => eprintln!("ERROR: Something went wrong in downloading the Cold Turkey installer."),
+    }
   }
 }
 
 fn try_install_cold_turkey() -> Result<(), Box<dyn std::error::Error>> {
-  let url = "http://getcoldturkey.com/files/Cold_Turkey_Installer.exe";
+  // Installs Cold Turkey if it does not exist
+  let url = "https://getcoldturkey.com/files/Cold_Turkey_Installer.exe";
   let response = reqwest::blocking::get(url)?;
   {
     let mut file = File::create("Cold_Turkey_Installer.exe")?;
     let bytes = response.bytes()?;
     file.write_all(&bytes)?;
   }
-  process::Command::new("./Cold_Turkey_Installer.exe").spawn()?;
+  let mut child = process::Command::new("./Cold_Turkey_Installer.exe").spawn()?;
+  child.wait()?;
+  fs::remove_file("Cold_Turkey_Installer.exe")?;
 
   Ok(())
 }
