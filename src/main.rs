@@ -3,7 +3,8 @@ use clap::{ColorChoice, Parser, Subcommand};
 use colour::e_yellow_ln;
 use ctsettings::{ColdTurkeySettings, UserStatus};
 use dialoguer::Password;
-use std::process;
+use std::io::Write;
+use std::{fs::File, process};
 use zeroize::Zeroizing;
 
 mod blocksettings;
@@ -90,6 +91,8 @@ enum Command {
   Suggest,
   /// List all the blocks in alphabetical order by default
   List,
+  /// Installs Cold Turkey
+  Install,
 }
 
 const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
@@ -135,6 +138,7 @@ fn main() {
         suggestdialog::suggest();
       }
       Command::List => list_all_blocks(),
+      Command::Install => install_cold_turkey(),
     },
     None => open_cold_turkey(),
   }
@@ -471,4 +475,24 @@ fn get_ct_settings() -> Option<ColdTurkeySettings> {
     }
     Err(_) => None,
   }
+}
+
+fn install_cold_turkey() {
+  match try_install_cold_turkey() {
+    Ok(_) => eprintln!("SUCCESS: Installation successful"),
+    Err(_) => eprintln!("ERROR: Something went wrong in downloading the Cold Turkey installer."),
+  }
+}
+
+fn try_install_cold_turkey() -> Result<(), Box<dyn std::error::Error>> {
+  let url = "http://getcoldturkey.com/files/Cold_Turkey_Installer.exe";
+  let response = reqwest::blocking::get(url)?;
+  {
+    let mut file = File::create("Cold_Turkey_Installer.exe")?;
+    let bytes = response.bytes()?;
+    file.write_all(&bytes)?;
+  }
+  process::Command::new("./Cold_Turkey_Installer.exe").spawn()?;
+
+  Ok(())
 }
