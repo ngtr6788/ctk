@@ -7,7 +7,6 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::{fs::File, process};
-use tempfile::{tempdir, Builder};
 use zeroize::Zeroizing;
 
 mod blocksettings;
