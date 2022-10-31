@@ -7,6 +7,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::{fs::File, process};
+use tempfile::{tempdir, Builder};
 use zeroize::Zeroizing;
 
 mod blocksettings;
@@ -97,7 +98,7 @@ enum Command {
   Install {
     /// Force installing Cold Turkey, regardless if Cold Turkey Blocker exists
     #[clap(short, long)]
-    force: bool
+    force: bool,
   },
 }
 
@@ -489,7 +490,10 @@ fn install_cold_turkey(force: bool) {
   } else {
     match try_install_cold_turkey() {
       Ok(_) => eprintln!("SUCCESS: Installation successful"),
-      Err(_) => eprintln!("ERROR: Something went wrong in downloading the Cold Turkey installer."),
+      Err(err) => {
+        dbg!(err);
+        eprintln!("ERROR: Something went wrong in downloading the Cold Turkey installer.")
+      }
     }
   }
 }
@@ -498,14 +502,16 @@ fn try_install_cold_turkey() -> Result<(), Box<dyn std::error::Error>> {
   // Installs Cold Turkey if it does not exist
   let url = "https://getcoldturkey.com/files/Cold_Turkey_Installer.exe";
   let response = reqwest::blocking::get(url)?;
+  let tmp_dir = std::env::temp_dir();
+  let tmp_path = tmp_dir.join("Cold_Turkey_Installer.exe");
   {
-    let mut file = File::create("Cold_Turkey_Installer.exe")?;
+    let mut file = File::create(&tmp_path)?;
     let bytes = response.bytes()?;
     file.write_all(&bytes)?;
   }
-  let mut child = process::Command::new("./Cold_Turkey_Installer.exe").spawn()?;
+  let mut child = process::Command::new(&tmp_path).spawn()?;
   child.wait()?;
-  fs::remove_file("Cold_Turkey_Installer.exe")?;
+  fs::remove_file(&tmp_path)?;
 
   Ok(())
 }
