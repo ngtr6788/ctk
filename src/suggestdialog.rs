@@ -346,6 +346,7 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
         .loop_interact();
     }
     LockMethod::None => {}
+    LockMethod::Schedule => {}
   }
 
   block_settings.break_type = break_method_from_stdin();
@@ -417,6 +418,14 @@ fn block_settings_from_stdin() -> Option<BlockSettings> {
   if schedule_block {
     block_settings.sched_type = SchedType::Scheduled;
     block_settings.schedule = read_schedule_from_stdin();
+
+    let lock_by_sched = Confirm::new()
+      .with_prompt("Do you want to lock this block during scheduled blocks?")
+      .loop_interact();
+
+    if lock_by_sched {
+      block_settings.lock = LockMethod::Schedule;
+    }
   } else {
     block_settings.sched_type = SchedType::Continuous;
   }

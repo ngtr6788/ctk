@@ -85,6 +85,7 @@ pub enum LockMethod {
   Window,
   Restart,
   Password,
+  Schedule,
 }
 
 #[derive(Debug, Serialize)]
