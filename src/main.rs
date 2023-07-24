@@ -1,7 +1,8 @@
 use chrono::{Date, DateTime, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
-use clap::{ColorChoice, Parser, Subcommand};
+use clap::Parser;
+use ctk_common::cli_parser::{ColdTurkey, Command, StartSubcommands};
+use ctk_common::ctsettings::{ColdTurkeySettings, UserStatus};
 use colour::e_yellow_ln;
-use ctsettings::{ColdTurkeySettings, UserStatus};
 use dialoguer::Password;
 use std::fs;
 use std::io::Write;
@@ -10,96 +11,10 @@ use std::{fs::File, process};
 use zeroize::Zeroizing;
 
 mod blocksettings;
-mod convert;
-mod ctsettings;
 mod historydeque;
 mod loop_dialoguer;
 mod matchstring;
 mod suggestdialog;
-
-#[derive(Parser)]
-#[clap(
-    name = "ctk",
-    author = "Nguyen Tran (GitHub: ngtr6788)",
-    version,
-    color = ColorChoice::Never
-)]
-/// A better CLI interface for Cold Turkey.
-///
-/// Must have Cold Turkey installed in:
-///     WINDOWS: C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe
-///     MAC: /Applications/Cold Turkey Blocker.app/Contents/MacOS/Cold Turkey Blocker
-struct ColdTurkey {
-  #[clap(subcommand)]
-  command: Option<Command>,
-}
-
-#[derive(Subcommand)]
-enum StartSubcommands {
-  /// Set a time period to block
-  For {
-    /// How long to block in minutes
-    #[clap(long)]
-    minutes: Option<u32>,
-    #[clap(long)]
-    hours: Option<u32>,
-    #[clap(long)]
-    days: Option<u32>,
-  },
-  /// Set when the block is finished
-  Until {
-    #[clap(parse(try_from_str = convert::str_to_time))]
-    /// The time of the end of a block
-    endtime: NaiveTime,
-    #[clap(parse(try_from_str = convert::str_to_date))]
-    /// The date of the end of a block. Defaults to today if not given
-    enddate: Option<NaiveDate>,
-  },
-}
-
-#[derive(Subcommand)]
-enum Command {
-  /// Start a block
-  Start {
-    /// The name of the Cold Turkey block
-    block_name: String,
-    #[clap(short, long)]
-    /// Password to lock the block
-    password: bool,
-    #[clap(subcommand)]
-    subcommand: Option<StartSubcommands>,
-  },
-  /// Stop a block
-  Stop {
-    /// The name of the Cold Turkey block
-    block_name: String,
-  },
-  /// Add websites (urls) to a block
-  Add {
-    /// The name of the Cold Turkey block
-    block_name: String,
-    /// The url to add in the block
-    url: String,
-    #[clap(short, long)]
-    /// Whether it is black or white-listed
-    except: bool,
-  },
-  /// Turn on if off, turn off if on
-  Toggle {
-    /// The name of the Cold Turkey block
-    block_name: String,
-  },
-  /// Interactively suggest what blocks you want Cold Turkey to have
-  Suggest,
-  /// List all the blocks in alphabetical order by default
-  List,
-  /// Installs Cold Turkey
-  Install {
-    /// Force installing Cold Turkey, regardless if Cold Turkey Blocker exists
-    #[clap(short, long)]
-    force: bool,
-  },
-}
 
 const CT_EXEC: &str = r"C:\Program Files\Cold Turkey\Cold Turkey Blocker.exe";
 

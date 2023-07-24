@@ -1,6 +1,6 @@
 use crate::blocksettings::{AppString, ScheduleBlock, ScheduleTimeTuple};
 use crate::blocksettings::{BlockSettings, BreakMethod, LockMethod, RangeWindow, SchedType};
-use crate::convert;
+use ctk_common::convert;
 use crate::historydeque::HistoryDeque;
 use crate::loop_dialoguer::LoopDialogue;
 use crate::matchstring::MatchString;

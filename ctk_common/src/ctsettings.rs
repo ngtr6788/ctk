@@ -1,6 +1,7 @@
 use serde::de::{Error, Unexpected};
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
+use std::process::Command;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,5 +118,18 @@ where
       Unexpected::Str(s),
       &"not a u32 integer",
     )),
+  }
+}
+
+pub fn get_ct_settings() -> Option<ColdTurkeySettings> {
+  match Command::new(r"C:\Program Files\Cold Turkey\CTMsgHostEdge.exe").output() {
+    Ok(block_stdout) => {
+      let output_vector = block_stdout.stdout;
+      match std::str::from_utf8(&output_vector[4..]) {
+        Ok(ct_string) => serde_json::from_str(ct_string).ok(),
+        Err(_) => None,
+      }
+    }
+    Err(_) => None,
   }
 }
